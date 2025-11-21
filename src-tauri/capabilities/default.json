@@ -5,6 +5,23 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-image",
+    "clipboard-manager:allow-write-image",
+    "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "global-shortcut:default",
+    "shell:default",
+    "fs:default",
+    {
+      "identifier": "fs:allow-appdata-read-recursive"
+    },
+    {
+      "identifier": "fs:allow-appdata-write-recursive"
+    }
   ]
 }
