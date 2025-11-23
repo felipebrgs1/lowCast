@@ -63,7 +63,7 @@ function Index() {
 	};
 
 	return (
-		<div className="h-full w-full bg-background/50 backdrop-blur-xl">
+		<div className="h-full w-full bg-background/85 backdrop-blur-xl">
 			<Command
 				shouldFilter={false}
 				className="rounded-none border-0 bg-transparent"

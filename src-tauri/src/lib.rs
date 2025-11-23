@@ -217,6 +217,21 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![list_applications, launch_application])
         .setup(|app| {
+            // Posicionar a janela
+            if let Some(window) = app.get_webview_window("main") {
+                // Tentar centralizar horizontalmente e posicionar levemente abaixo do topo
+                if let Ok(Some(monitor)) = window.current_monitor() {
+                    let screen_size = monitor.size();
+                    let window_size = window.outer_size().unwrap_or(tauri::PhysicalSize { width: 800, height: 600 });
+                    
+                    let x = (screen_size.width as i32 - window_size.width as i32) / 2;
+                    // 15% da altura da tela para baixo
+                    let y = (screen_size.height as f64 * 0.40) as i32;
+                    
+                    let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                }
+            }
+
             // Criar diretório de dados da app se não existir
             let app_data_dir = app.path().app_data_dir().expect("failed to get app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();

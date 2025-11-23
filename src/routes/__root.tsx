@@ -7,7 +7,7 @@ function RootLayout() {
     useGlobalShortcut('Alt+Space');
 
     return (
-        <div className='flex flex-col h-screen bg-transparent text-foreground'>
+        <div className='flex flex-col h-screen bg-background/85 backdrop-blur-xl text-foreground'>
             <nav className='flex items-center gap-1 p-2 border-b bg-card/50'>
                 <Link
                     to='/'
@@ -31,7 +31,7 @@ function RootLayout() {
                     Apps
                 </Link>
             </nav>
-            <main className='flex-1'>
+            <main className='flex-1 overflow-auto'>
                 <Outlet />
             </main>
         </div>

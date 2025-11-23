@@ -18,7 +18,7 @@ function AppsPage() {
 	}, [loadApplications]);
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full bg-background/85 backdrop-blur-xl">
 			<div className="p-4 border-b space-y-3">
 				<h1 className="text-lg font-semibold">Aplicativos</h1>
 
