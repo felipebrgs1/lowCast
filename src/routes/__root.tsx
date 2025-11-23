@@ -31,7 +31,7 @@ function RootLayout() {
                     Apps
                 </Link>
             </nav>
-            <main className='flex-1 overflow-hidden'>
+            <main className='flex-1'>
                 <Outlet />
             </main>
         </div>
