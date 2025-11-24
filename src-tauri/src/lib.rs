@@ -82,47 +82,107 @@ fn parse_desktop_file(path: &Path) -> Option<Application> {
 
 #[tauri::command]
 fn list_applications() -> Vec<Application> {
-    let mut apps: Vec<Application> = Vec::new();
-    let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    #[cfg(target_os = "linux")]
+    {
+        let mut apps: Vec<Application> = Vec::new();
+        let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    let search_paths = [
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        &format!(
-            "{}/.local/share/applications",
-            std::env::var("HOME").unwrap_or_default()
-        ),
-        "/var/lib/flatpak/exports/share/applications",
-        &format!(
-            "{}/.local/share/flatpak/exports/share/applications",
-            std::env::var("HOME").unwrap_or_default()
-        ),
-    ];
+        let search_paths = [
+            "/usr/share/applications",
+            "/usr/local/share/applications",
+            &format!(
+                "{}/.local/share/applications",
+                std::env::var("HOME").unwrap_or_default()
+            ),
+            "/var/lib/flatpak/exports/share/applications",
+            &format!(
+                "{}/.local/share/flatpak/exports/share/applications",
+                std::env::var("HOME").unwrap_or_default()
+            ),
+        ];
 
-    for search_path in &search_paths {
-        let path = Path::new(search_path);
-        if !path.exists() {
-            continue;
-        }
+        for search_path in &search_paths {
+            let path = Path::new(search_path);
+            if !path.exists() {
+                continue;
+            }
 
-        if let Ok(entries) = fs::read_dir(path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().map(|e| e == "desktop").unwrap_or(false) {
-                    if let Some(app) = parse_desktop_file(&path) {
-                        // Evitar duplicatas pelo nome
-                        if seen_names.insert(app.name.clone()) {
-                            apps.push(app);
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.extension().map(|e| e == "desktop").unwrap_or(false) {
+                        if let Some(app) = parse_desktop_file(&path) {
+                            // Evitar duplicatas pelo nome
+                            if seen_names.insert(app.name.clone()) {
+                                apps.push(app);
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Ordenar por nome
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps
     }
 
-    // Ordenar por nome
-    apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-    apps
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        
+        let ps_script = r#"
+            $paths = @(
+                "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
+                "$env:AppData\Microsoft\Windows\Start Menu\Programs"
+            )
+            $shortcuts = Get-ChildItem -Path $paths -Recurse -Include *.lnk -ErrorAction SilentlyContinue
+            $apps = @()
+            $shell = New-Object -ComObject WScript.Shell
+            foreach ($s in $shortcuts) {
+                try {
+                    $shortcut = $shell.CreateShortcut($s.FullName)
+                    $target = $shortcut.TargetPath
+                    if ($target -match "\.exe$") {
+                        $apps += @{
+                            name = $s.BaseName
+                            exec = $target
+                            icon = "" 
+                            description = $shortcut.Description
+                            desktop_file = $s.FullName
+                            categories = @()
+                        }
+                    }
+                } catch {}
+            }
+            $apps | ConvertTo-Json -Depth 2
+        "#;
+
+        let output = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", ps_script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output();
+
+        if let Ok(output) = output {
+            if let Ok(json) = String::from_utf8(output.stdout) {
+                // PowerShell might return a single object or an array. 
+                // If it's a single object, it won't be a JSON array.
+                // But we initialized $apps as @(), so it should be an array.
+                if let Ok(apps) = serde_json::from_str::<Vec<Application>>(&json) {
+                    let mut apps = apps;
+                    apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    return apps;
+                }
+            }
+        }
+        
+        Vec::new()
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        Vec::new()
+    }
 }
 
 #[tauri::command]
@@ -157,6 +217,21 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![list_applications, launch_application])
         .setup(|app| {
+            // Posicionar a janela
+            if let Some(window) = app.get_webview_window("main") {
+                // Tentar centralizar horizontalmente e posicionar levemente abaixo do topo
+                if let Ok(Some(monitor)) = window.current_monitor() {
+                    let screen_size = monitor.size();
+                    let window_size = window.outer_size().unwrap_or(tauri::PhysicalSize { width: 800, height: 600 });
+                    
+                    let x = (screen_size.width as i32 - window_size.width as i32) / 2;
+                    // 15% da altura da tela para baixo
+                    let y = (screen_size.height as f64 * 0.40) as i32;
+                    
+                    let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                }
+            }
+
             // Criar diretório de dados da app se não existir
             let app_data_dir = app.path().app_data_dir().expect("failed to get app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();

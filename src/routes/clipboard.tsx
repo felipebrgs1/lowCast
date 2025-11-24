@@ -36,7 +36,7 @@ function ClipboardPage() {
 	}, [loadHistory, startListening, stopListening]);
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full overflow-hidden bg-background/85 backdrop-blur-xl">
 			<div className="p-4 border-b space-y-3">
 				<div className="flex items-center justify-between">
 					<h1 className="text-lg font-semibold">Clipboard History</h1>
