@@ -23,7 +23,17 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "/usr/share/pixmaps/**",
+          "/usr/share/icons/**",
+          "/usr/share/gpsd/**",
+          "$HOME/.local/share/icons/**",
+          "$HOME/.local/share/JetBrains/**"
+        ]
+      }
     }
   },
   "bundle": {

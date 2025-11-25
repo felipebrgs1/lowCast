@@ -5,6 +5,7 @@ export interface Application {
 	name: string;
 	exec: string;
 	icon: string | null;
+	iconDataUrl?: string | null;
 	description: string | null;
 	desktop_file: string;
 	categories: string[];
@@ -32,7 +33,27 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 		set({ isLoading: true });
 		try {
 			const apps = await invoke<Application[]>("list_applications");
-			set({ applications: apps, filteredApps: apps });
+
+			// Carregar os data URLs dos ícones em paralelo
+			const appsWithIcons = await Promise.all(
+				apps.map(async (app) => {
+					if (app.icon) {
+						try {
+							const dataUrl = await invoke<string>("get_icon_data_url", {
+								iconPath: app.icon,
+							});
+							return { ...app, iconDataUrl: dataUrl };
+						} catch (error) {
+							// Se falhar ao carregar o ícone, continuar sem ele
+							console.warn(`Failed to load icon for ${app.name}:`, error);
+							return { ...app, iconDataUrl: null };
+						}
+					}
+					return { ...app, iconDataUrl: null };
+				}),
+			);
+
+			set({ applications: appsWithIcons, filteredApps: appsWithIcons });
 		} catch (error) {
 			console.error("Erro ao carregar aplicativos:", error);
 		} finally {
