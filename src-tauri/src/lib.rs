@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Application {
@@ -206,6 +206,103 @@ fn launch_application(exec: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn show_window(window: tauri::Window) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn hide_window(window: tauri::Window) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn toggle_window(window: tauri::Window) -> Result<(), String> {
+    let is_visible = window.is_visible().map_err(|e| e.to_string())?;
+    if is_visible {
+        window.hide().map_err(|e| e.to_string())?;
+    } else {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {
+    if args.len() <= 1 {
+        // Sem argumentos, apenas mostrar a janela
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        return;
+    }
+
+    let window = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => return,
+    };
+
+    // Processar o primeiro argumento (ignorando o nome do executável em args[0])
+    let command = args.get(1).map(|s| s.as_str());
+
+    match command {
+        Some("--show") => {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        Some("--hide") => {
+            let _ = window.hide();
+        }
+        Some("--toggle") => {
+            if let Ok(is_visible) = window.is_visible() {
+                if is_visible {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        }
+        Some("--history") | Some("--clipboard") => {
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.emit("cli-navigate", "/clipboard");
+        }
+        Some("--apps") => {
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.emit("cli-navigate", "/apps");
+        }
+        Some("--home") => {
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.emit("cli-navigate", "/");
+        }
+        Some("--help") | Some("-h") => {
+            println!("lowCast - Desktop launcher and clipboard manager");
+            println!("\nUsage: lowcast [COMMAND]\n");
+            println!("Commands:");
+            println!("  --show, (default)    Show the window");
+            println!("  --hide               Hide the window");
+            println!("  --toggle             Toggle window visibility");
+            println!("  --history            Show clipboard history");
+            println!("  --clipboard          Alias for --history");
+            println!("  --apps               Show applications list");
+            println!("  --home               Show home/search page");
+            println!("  --help, -h           Show this help message");
+        }
+        _ => {
+            // Argumento desconhecido ou sem argumentos, apenas mostrar
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -215,7 +312,18 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![list_applications, launch_application])
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Quando uma segunda instância é iniciada, processar os argumentos
+            println!("Segunda instância detectada com args: {:?}", args);
+            process_cli_args(app, args);
+        }))
+        .invoke_handler(tauri::generate_handler![
+            list_applications,
+            launch_application,
+            show_window,
+            hide_window,
+            toggle_window
+        ])
         .setup(|app| {
             // Posicionar a janela
             if let Some(window) = app.get_webview_window("main") {
@@ -223,11 +331,11 @@ pub fn run() {
                 if let Ok(Some(monitor)) = window.current_monitor() {
                     let screen_size = monitor.size();
                     let window_size = window.outer_size().unwrap_or(tauri::PhysicalSize { width: 800, height: 600 });
-                    
+
                     let x = (screen_size.width as i32 - window_size.width as i32) / 2;
                     // 15% da altura da tela para baixo
                     let y = (screen_size.height as f64 * 0.40) as i32;
-                    
+
                     let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
                 }
             }
@@ -235,6 +343,11 @@ pub fn run() {
             // Criar diretório de dados da app se não existir
             let app_data_dir = app.path().app_data_dir().expect("failed to get app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
+
+            // Processar argumentos CLI na primeira inicialização
+            let args: Vec<String> = std::env::args().collect();
+            process_cli_args(&app.handle(), args);
+
             Ok(())
         })
         .run(tauri::generate_context!())
