@@ -1,5 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useNavigate } from "@tanstack/react-router";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect } from "react";
 
 export function useCliNavigation() {
