@@ -1,7 +1,7 @@
+import { Image } from "@tauri-apps/api/image";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import * as clipboard from "@tauri-apps/plugin-clipboard-manager";
-import { exists, mkdir, writeFile, readFile } from "@tauri-apps/plugin-fs";
-import { Image } from "@tauri-apps/api/image";
+import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { create } from "zustand";
 import {
 	addClipboardEntry,
@@ -150,16 +150,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 				// Criar objeto Image do Tauri
 				const image = await Image.fromBytes(imageBytes);
 				// Escrever imagem no clipboard
-				// @ts-ignore - writeImage pode não estar na definição de tipos ainda
 				await clipboard.writeImage(image);
-				
-				// Atualizar lastClipboardContent para evitar re-salvar imediatamente
-				// Precisamos ler o conteúdo para gerar o hash ou usar o hash existente se possível
-				// Aqui vamos usar um identificador especial para imagens copiadas
-				// O ideal seria calcular o hash da imagem, mas vamos assumir que se copiamos,
-				// não queremos salvar de volta imediatamente.
-				// Como o listener verifica o hash do conteúdo do clipboard, se for a mesma imagem,
-				// o hash será igual e não salvará duplicado.
 			}
 		} catch (error) {
 			console.error("[Clipboard] Error copying to clipboard:", error);
@@ -174,6 +165,8 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 
 		clipboardInterval = setInterval(async () => {
 			try {
+				let contentProcessed = false;
+
 				// 1. Tentar ler texto
 				try {
 					const text = await clipboard.readText();
@@ -182,53 +175,47 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 						lastClipboardContent = text;
 						await get().addEntry("text", text);
 						console.log("[Clipboard] Text entry saved!");
-						return; // Priorizar texto se houver mudança
+						contentProcessed = true;
 					}
-				} catch (e) {
+				} catch (_e) {
 					// Ignorar erros de leitura de texto
 				}
 
-				// 2. Tentar ler imagem
-				try {
-					// @ts-ignore - readImage pode não estar na definição de tipos ainda
-					const image = await clipboard.readImage();
-					if (image) {
-						// Converter para base64 PNG
-						const size = await image.size();
-						const rgba = await image.rgba();
-						
-						const canvas = document.createElement('canvas');
-						canvas.width = size.width;
-						canvas.height = size.height;
-						const ctx = canvas.getContext('2d');
-						if (ctx) {
-							const imageData = new ImageData(
-								new Uint8ClampedArray(rgba),
-								size.width,
-								size.height
-							);
-							ctx.putImageData(imageData, 0, 0);
-							const dataUrl = canvas.toDataURL('image/png');
-							const base64 = dataUrl.split(',')[1];
+				// 2. Tentar ler imagem (apenas se não processamos texto)
+				if (!contentProcessed) {
+					try {
+						const image = await clipboard.readImage();
+						if (image) {
+							// Converter para base64 PNG
+							const size = await image.size();
+							const rgba = await image.rgba();
 
-							// Verificar hash para evitar duplicatas
-							const hash = await hashContent(base64);
-							// Usar uma variável estática ou estado para armazenar o último hash de imagem seria ideal
-							// Mas como lastClipboardContent é string, podemos usar ele se prefixarmos
-							const contentKey = `image:${hash}`;
-							
-							if (lastClipboardContent !== contentKey) {
-								console.log("[Clipboard] New image detected, saving...");
-								lastClipboardContent = contentKey;
-								await get().addEntry("image", base64);
-								console.log("[Clipboard] Image entry saved!");
+							const canvas = document.createElement("canvas");
+							canvas.width = size.width;
+							canvas.height = size.height;
+							const ctx = canvas.getContext("2d");
+							if (ctx) {
+								const imageData = new ImageData(new Uint8ClampedArray(rgba), size.width, size.height);
+								ctx.putImageData(imageData, 0, 0);
+								const dataUrl = canvas.toDataURL("image/png");
+								const base64 = dataUrl.split(",")[1];
+
+								// Verificar hash para evitar duplicatas
+								const hash = await hashContent(base64);
+								const contentKey = `image:${hash}`;
+
+								if (lastClipboardContent !== contentKey) {
+									console.log("[Clipboard] New image detected, saving...");
+									lastClipboardContent = contentKey;
+									await get().addEntry("image", base64);
+									console.log("[Clipboard] Image entry saved!");
+								}
 							}
 						}
+					} catch (_e) {
+						// Erro ao ler imagem ou clipboard vazio
 					}
-				} catch (e) {
-					// Erro ao ler imagem ou clipboard vazio
 				}
-
 			} catch (error) {
 				if (error instanceof Error && !error.message.includes("empty")) {
 					console.error("[Clipboard] Read error:", error);

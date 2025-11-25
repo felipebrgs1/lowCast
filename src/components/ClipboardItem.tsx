@@ -1,12 +1,12 @@
 import { readFile } from "@tauri-apps/plugin-fs";
-import { Check, Copy, FileText, Image as ImageIcon, Trash2, Maximize2 } from "lucide-react";
+import { Check, Copy, FileText, Image as ImageIcon, Maximize2, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ClipboardEntry } from "@/lib/database";
 import { useClipboardStore } from "@/stores/clipboardStore";
-import { useState, useEffect } from "react";
 
 function ClipboardImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
 	const [src, setSrc] = useState<string>("");
@@ -39,8 +39,14 @@ function ClipboardImage({ path, alt, className }: { path: string; alt: string; c
 	}, [path]);
 
 	if (!src) return <div className={`${className} bg-muted/50 animate-pulse`} />;
-	
-	return <img src={src} alt={alt} className={className} />;
+
+	return (
+		<img
+			src={src}
+			alt={alt}
+			className={className}
+		/>
+	);
 }
 
 interface ClipboardItemProps {
@@ -74,14 +80,14 @@ export function ClipboardItem({ entry }: ClipboardItemProps) {
 	return (
 		<Card
 			className={`p-3 transition-all group cursor-pointer border-l-4 ${
-				isCopied 
-					? "bg-green-500/10 border-l-green-500 border-y-transparent border-r-transparent" 
+				isCopied
+					? "bg-green-500/10 border-l-green-500 border-y-transparent border-r-transparent"
 					: "hover:bg-accent/50 border-l-transparent"
 			}`}
 			onClick={handleCopy}
 		>
 			<div className="flex items-start gap-3">
-				<div className="flex-shrink-0 mt-1">
+				<div className="shrink-0 mt-1">
 					{entry.content_type === "text" ? (
 						<FileText className="w-4 h-4 text-muted-foreground" />
 					) : (
@@ -97,9 +103,15 @@ export function ClipboardItem({ entry }: ClipboardItemProps) {
 					) : (
 						<Dialog>
 							<DialogTrigger asChild>
-								<div 
-									className="relative group/image inline-block" 
+								<button
+									type="button"
+									className="relative group/image inline-block cursor-pointer border-0 bg-transparent p-0"
 									onClick={(e) => e.stopPropagation()}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.stopPropagation();
+										}
+									}}
 								>
 									<ClipboardImage
 										path={entry.content}
@@ -109,7 +121,7 @@ export function ClipboardItem({ entry }: ClipboardItemProps) {
 									<div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center rounded">
 										<Maximize2 className="w-5 h-5 text-white" />
 									</div>
-								</div>
+								</button>
 							</DialogTrigger>
 							<DialogContent className="max-w-3xl max-h-[80vh] p-0 bg-transparent border-none shadow-none">
 								<DialogTitle className="sr-only">Visualização da Imagem</DialogTitle>

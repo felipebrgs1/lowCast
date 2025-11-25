@@ -37,7 +37,7 @@ export function AppItem({ app, onLaunch }: AppItemProps) {
 			onClick={handleLaunch}
 		>
 			<div className="flex items-center gap-3">
-				<div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+				<div className="shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
 					{iconPath ? (
 						<img
 							src={`file://${iconPath}`}
