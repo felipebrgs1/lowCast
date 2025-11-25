@@ -5,6 +5,8 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:image:default",
+    "core:webview:default",
     "opener:default",
     "clipboard-manager:default",
     "clipboard-manager:allow-read-text",
@@ -22,6 +24,26 @@
     },
     {
       "identifier": "fs:allow-appdata-write-recursive"
+    },
+    {
+      "identifier": "fs:allow-read",
+      "allow": [
+        "/usr/share/pixmaps/**",
+        "/usr/share/icons/**",
+        "/usr/share/gpsd/**",
+        "$HOME/.local/share/icons/**",
+        "$HOME/.local/share/JetBrains/**"
+      ]
+    },
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "/usr/share/pixmaps/**",
+        "/usr/share/icons/**",
+        "/usr/share/gpsd/**",
+        "$HOME/.local/share/icons/**",
+        "$HOME/.local/share/JetBrains/**"
+      ]
     }
   ]
 }

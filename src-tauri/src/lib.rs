@@ -14,6 +14,49 @@ pub struct Application {
     pub categories: Vec<String>,
 }
 
+fn resolve_icon_path(icon_name: &str) -> Option<String> {
+    // Se já é um caminho absoluto, retornar como está
+    if icon_name.starts_with('/') {
+        if Path::new(icon_name).exists() {
+            return Some(icon_name.to_string());
+        }
+        return None;
+    }
+
+    // Remover extensão se houver (freedesktop.org spec permite icon names sem extensão)
+    let icon_base = icon_name
+        .trim_end_matches(".png")
+        .trim_end_matches(".svg")
+        .trim_end_matches(".xpm");
+
+    // Diretórios comuns de ícones (em ordem de prioridade)
+    let icon_paths = [
+        // Pixmaps (geralmente tem ícones em tamanho fixo)
+        format!("/usr/share/pixmaps/{}.png", icon_base),
+        format!("/usr/share/pixmaps/{}.svg", icon_base),
+        format!("/usr/share/pixmaps/{}.xpm", icon_base),
+        // Hicolor theme (padrão)
+        format!("/usr/share/icons/hicolor/48x48/apps/{}.png", icon_base),
+        format!("/usr/share/icons/hicolor/64x64/apps/{}.png", icon_base),
+        format!("/usr/share/icons/hicolor/128x128/apps/{}.png", icon_base),
+        format!("/usr/share/icons/hicolor/scalable/apps/{}.svg", icon_base),
+        // User local icons
+        format!("{}/.local/share/icons/hicolor/48x48/apps/{}.png",
+            std::env::var("HOME").unwrap_or_default(), icon_base),
+        format!("{}/.local/share/icons/hicolor/scalable/apps/{}.svg",
+            std::env::var("HOME").unwrap_or_default(), icon_base),
+    ];
+
+    // Retornar o primeiro caminho que existir
+    for path in &icon_paths {
+        if Path::new(path).exists() {
+            return Some(path.clone());
+        }
+    }
+
+    None
+}
+
 fn parse_desktop_file(path: &Path) -> Option<Application> {
     let content = fs::read_to_string(path).ok()?;
     let mut in_desktop_entry = false;
@@ -63,7 +106,11 @@ fn parse_desktop_file(path: &Path) -> Option<Application> {
         .trim()
         .to_string();
 
-    let icon = entries.get("Icon").cloned();
+    // Resolver caminho do ícone
+    let icon = entries
+        .get("Icon")
+        .and_then(|icon_name| resolve_icon_path(icon_name));
+
     let description = entries.get("Comment").cloned();
     let categories: Vec<String> = entries
         .get("Categories")
@@ -231,6 +278,36 @@ async fn toggle_window(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_icon_data_url(icon_path: String) -> Result<String, String> {
+    use std::io::Read;
+
+    // Ler o arquivo de ícone
+    let mut file = fs::File::open(&icon_path).map_err(|e| e.to_string())?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+
+    // Determinar o mime type baseado na extensão
+    let mime_type = if icon_path.ends_with(".svg") {
+        "image/svg+xml"
+    } else if icon_path.ends_with(".png") {
+        "image/png"
+    } else if icon_path.ends_with(".jpg") || icon_path.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if icon_path.ends_with(".xpm") {
+        "image/x-xpixmap"
+    } else {
+        "application/octet-stream"
+    };
+
+    // Codificar em base64
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    let base64_data = BASE64.encode(&buffer);
+
+    // Retornar como data URL
+    Ok(format!("data:{};base64,{}", mime_type, base64_data))
+}
+
 fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {
     if args.len() <= 1 {
         // Sem argumentos, apenas mostrar a janela
@@ -322,7 +399,8 @@ pub fn run() {
             launch_application,
             show_window,
             hide_window,
-            toggle_window
+            toggle_window,
+            get_icon_data_url
         ])
         .setup(|app| {
             // Posicionar a janela

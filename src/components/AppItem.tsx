@@ -15,22 +15,6 @@ export function AppItem({ app, onLaunch }: AppItemProps) {
 		onLaunch?.();
 	};
 
-	// Tentar resolver o ícone do app
-	const getIconPath = (iconName: string | null): string | null => {
-		if (!iconName) return null;
-
-		// Se já é um caminho absoluto, usar diretamente
-		if (iconName.startsWith("/")) {
-			return iconName;
-		}
-
-		// Por agora, retornar null e usar o ícone padrão
-		// TODO: Implementar busca em /usr/share/icons
-		return null;
-	};
-
-	const iconPath = getIconPath(app.icon);
-
 	return (
 		<Card
 			className="p-3 hover:bg-accent/50 transition-colors cursor-pointer"
@@ -38,9 +22,9 @@ export function AppItem({ app, onLaunch }: AppItemProps) {
 		>
 			<div className="flex items-center gap-3">
 				<div className="shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-					{iconPath ? (
+					{app.iconDataUrl ? (
 						<img
-							src={`file://${iconPath}`}
+							src={app.iconDataUrl}
 							alt={app.name}
 							className="w-8 h-8 object-contain"
 							onError={(e) => {
@@ -49,7 +33,7 @@ export function AppItem({ app, onLaunch }: AppItemProps) {
 							}}
 						/>
 					) : null}
-					<AppWindow className={`w-6 h-6 text-muted-foreground ${iconPath ? "hidden" : ""}`} />
+					<AppWindow className={`w-6 h-6 text-muted-foreground ${app.iconDataUrl ? "hidden" : ""}`} />
 				</div>
 
 				<div className="flex-1 min-w-0">

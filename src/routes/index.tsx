@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { AppWindow, FileText, Image as ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -87,9 +86,9 @@ function Index() {
 								>
 									<div className="flex items-center gap-3 w-full">
 										<div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
-											{app.icon ? (
+											{app.iconDataUrl ? (
 												<img
-													src={convertFileSrc(app.icon)}
+													src={app.iconDataUrl}
 													alt={app.name}
 													className="h-6 w-6 object-contain"
 													onError={(e) => {
@@ -99,7 +98,7 @@ function Index() {
 												/>
 											) : null}
 											<AppWindow
-												className={`h-5 w-5 text-muted-foreground ${app.icon ? "hidden" : ""}`}
+												className={`h-5 w-5 text-muted-foreground ${app.iconDataUrl ? "hidden" : ""}`}
 											/>
 										</div>
 										<div className="flex flex-col">
