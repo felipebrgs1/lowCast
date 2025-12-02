@@ -8,12 +8,13 @@ use tauri::{Emitter, Manager};
 pub struct Application {
     pub name: String,
     pub exec: String,
-    pub icon: Option<String>,
+    pub icon: String,
     pub description: Option<String>,
     pub desktop_file: String,
     pub categories: Vec<String>,
 }
 
+#[allow(dead_code)]
 fn resolve_icon_path(icon_name: &str) -> Option<String> {
     // Se já é um caminho absoluto, retornar como está
     if icon_name.starts_with('/') {
@@ -57,6 +58,8 @@ fn resolve_icon_path(icon_name: &str) -> Option<String> {
     None
 }
 
+#[cfg(target_os = "linux")]
+#[allow(dead_code)]
 fn parse_desktop_file(path: &Path) -> Option<Application> {
     let content = fs::read_to_string(path).ok()?;
     let mut in_desktop_entry = false;
@@ -109,7 +112,8 @@ fn parse_desktop_file(path: &Path) -> Option<Application> {
     // Resolver caminho do ícone
     let icon = entries
         .get("Icon")
-        .and_then(|icon_name| resolve_icon_path(icon_name));
+        .and_then(|icon_name| resolve_icon_path(icon_name))
+        .unwrap_or_default();
 
     let description = entries.get("Comment").cloned();
     let categories: Vec<String> = entries
@@ -177,7 +181,7 @@ fn list_applications() -> Vec<Application> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        
+
         let ps_script = r#"
             $paths = @(
                 "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
@@ -190,12 +194,36 @@ fn list_applications() -> Vec<Application> {
                 try {
                     $shortcut = $shell.CreateShortcut($s.FullName)
                     $target = $shortcut.TargetPath
-                    if ($target -match "\.exe$") {
+                    if ($target -match "\.exe$" -and $target -and (Test-Path $target -ErrorAction SilentlyContinue)) {
+                        # Get icon location
+                        $rawIconLocation = $shortcut.IconLocation
+
+                        # Determine final icon location
+                        if ([string]::IsNullOrWhiteSpace($rawIconLocation)) {
+                            # No icon specified in shortcut, use the target exe
+                            $iconLocation = "$target,0"
+                        } else {
+                            # Expand environment variables (e.g., %windir%)
+                            $iconLocation = [Environment]::ExpandEnvironmentVariables($rawIconLocation)
+
+                            # Parse icon location which might be in format "path,index" or "path,-index"
+                            if ($iconLocation -match '^(.+?),(-?\d+)$') {
+                                # Already has index, keep as is
+                                # No change needed
+                            } elseif ($iconLocation -match '\.(exe|dll|ico)$') {
+                                # Add default index 0 for exe/dll/ico files
+                                $iconLocation = "$iconLocation,0"
+                            }
+                        }
+
+                        # Convert empty strings to null for optional fields
+                        $descValue = if ([string]::IsNullOrWhiteSpace($shortcut.Description)) { $null } else { $shortcut.Description }
+
                         $apps += @{
                             name = $s.BaseName
                             exec = $target
-                            icon = "" 
-                            description = $shortcut.Description
+                            icon = $iconLocation
+                            description = $descValue
                             desktop_file = $s.FullName
                             categories = @()
                         }
@@ -206,23 +234,61 @@ fn list_applications() -> Vec<Application> {
         "#;
 
         let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", ps_script])
+            .args([
+                "-NoProfile",
+                "-OutputEncoding", "UTF8",
+                "-Command",
+                &format!("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {}", ps_script)
+            ])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .output();
 
         if let Ok(output) = output {
-            if let Ok(json) = String::from_utf8(output.stdout) {
-                // PowerShell might return a single object or an array. 
-                // If it's a single object, it won't be a JSON array.
-                // But we initialized $apps as @(), so it should be an array.
-                if let Ok(apps) = serde_json::from_str::<Vec<Application>>(&json) {
+            eprintln!("[Rust] PowerShell exit code: {:?}", output.status.code());
+
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if !stderr.is_empty() {
+                eprintln!("[Rust] PowerShell stderr: {}", stderr);
+            }
+
+            // Try UTF-8 first, fall back to lossy conversion
+            let json = match String::from_utf8(output.stdout.clone()) {
+                Ok(s) => {
+                    eprintln!("[Rust] Successfully decoded as UTF-8");
+                    s
+                }
+                Err(_) => {
+                    eprintln!("[Rust] UTF-8 decode failed, using lossy conversion");
+                    String::from_utf8_lossy(&output.stdout).to_string()
+                }
+            };
+
+            eprintln!("[Rust] JSON length: {}", json.len());
+
+            if json.trim().is_empty() {
+                eprintln!("[Rust] Warning: PowerShell returned empty output");
+                return Vec::new();
+            }
+
+            // PowerShell might return a single object or an array.
+            // If it's a single object, it won't be a JSON array.
+            // But we initialized $apps as @(), so it should be an array.
+            match serde_json::from_str::<Vec<Application>>(&json) {
+                Ok(apps) => {
+                    eprintln!("[Rust] Successfully parsed {} applications", apps.len());
                     let mut apps = apps;
                     apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
                     return apps;
                 }
+                Err(_e) => {
+                    eprintln!("[Rust] JSON parse error: {}", _e);
+                    eprintln!("[Rust] First 500 chars of JSON: {}", &json[..json.len().min(500)]);
+                }
             }
+        } else {
+            eprintln!("[Rust] Failed to execute PowerShell command");
         }
-        
+
         Vec::new()
     }
 
@@ -281,6 +347,17 @@ async fn toggle_window(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 fn get_icon_data_url(icon_path: String) -> Result<String, String> {
     use std::io::Read;
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
+    // Handle Windows exe/dll/ico icon extraction
+    #[cfg(target_os = "windows")]
+    {
+        if icon_path.ends_with(".exe") || icon_path.contains(".exe,") ||
+           icon_path.ends_with(".dll") || icon_path.contains(".dll,") ||
+           (icon_path.ends_with(".ico") && icon_path.contains(",")) {
+            return extract_windows_icon(&icon_path);
+        }
+    }
 
     // Ler o arquivo de ícone
     let mut file = fs::File::open(&icon_path).map_err(|e| e.to_string())?;
@@ -296,16 +373,91 @@ fn get_icon_data_url(icon_path: String) -> Result<String, String> {
         "image/jpeg"
     } else if icon_path.ends_with(".xpm") {
         "image/x-xpixmap"
+    } else if icon_path.ends_with(".ico") {
+        "image/x-icon"
     } else {
         "application/octet-stream"
     };
 
     // Codificar em base64
-    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
     let base64_data = BASE64.encode(&buffer);
 
     // Retornar como data URL
     Ok(format!("data:{};base64,{}", mime_type, base64_data))
+}
+
+#[cfg(target_os = "windows")]
+fn extract_windows_icon(icon_path: &str) -> Result<String, String> {
+    use std::os::windows::process::CommandExt;
+
+    // Parse icon location (format can be "path.exe" or "path.exe,index")
+    let parts: Vec<&str> = icon_path.split(',').collect();
+    let exe_path = parts[0].trim();
+
+    // Validate that exe_path is not empty
+    if exe_path.is_empty() {
+        return Err("Empty icon path".to_string());
+    }
+
+    // Validate that the file exists
+    if !Path::new(exe_path).exists() {
+        return Err(format!("Icon file not found: {}", exe_path));
+    }
+
+    let icon_index = parts.get(1)
+        .and_then(|s| s.trim().parse::<i32>().ok())
+        .unwrap_or(0);
+
+    // Use PowerShell to extract icon as base64
+    // Note: ExtractAssociatedIcon doesn't support icon indices, so we use a simpler approach for now
+    // For DLLs with specific indices, this will just get the default icon
+    let ps_script = format!(
+        r#"
+        Add-Type -AssemblyName System.Drawing
+        try {{
+            # For .ico files, read directly
+            if ("{}" -match '\.ico$') {{
+                $bytes = [System.IO.File]::ReadAllBytes("{}")
+                [Convert]::ToBase64String($bytes)
+            }} else {{
+                # For exe/dll, extract associated icon
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("{}")
+                if ($icon) {{
+                    $bitmap = $icon.ToBitmap()
+                    $ms = New-Object System.IO.MemoryStream
+                    $bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+                    $bytes = $ms.ToArray()
+                    $ms.Close()
+                    [Convert]::ToBase64String($bytes)
+                }}
+            }}
+        }} catch {{
+            Write-Error $_.Exception.Message
+        }}
+        "#,
+        exe_path.replace("\\", "\\\\").replace("\"", "\\\""),
+        exe_path.replace("\\", "\\\\").replace("\"", "\\\""),
+        exe_path.replace("\\", "\\\\").replace("\"", "\\\"")
+    );
+
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_script])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output()
+        .map_err(|e| format!("Failed to execute PowerShell: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("PowerShell error: {}", stderr));
+    }
+
+    let base64_data = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if base64_data.is_empty() {
+        return Err("No icon data extracted".to_string());
+    }
+
+    Ok(format!("data:image/png;base64,{}", base64_data))
 }
 
 fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {

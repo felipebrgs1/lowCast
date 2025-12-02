@@ -54,6 +54,11 @@ function Index() {
 		searchApps(query);
 	}, [query, searchApps]);
 
+	// Debug: verificar estado dos apps
+	useEffect(() => {
+		console.log("filteredApps:", filteredApps.length, filteredApps);
+	}, [filteredApps]);
+
 	const handleLaunchApp = async (app: Application) => {
 		await launchApp(app);
 	};
@@ -99,12 +104,16 @@ function Index() {
 						</CommandItem>
 					</CommandGroup>
 
-					{filteredApps.length > 0 && <CommandSeparator />}
+					<CommandSeparator />
 
 					{/* Apps do Sistema (Windows/Linux) */}
-					{filteredApps.length > 0 && (
-						<CommandGroup heading="Aplicativos do Sistema">
-							{filteredApps.map((app) => (
+					<CommandGroup heading="Aplicativos do Sistema">
+						{filteredApps.length === 0 ? (
+							<div className="px-2 py-4 text-center text-sm text-muted-foreground">
+								Carregando aplicativos...
+							</div>
+						) : (
+							filteredApps.map((app) => (
 								<CommandItem
 									key={app.desktop_file}
 									onSelect={() => handleLaunchApp(app)}
@@ -138,9 +147,9 @@ function Index() {
 									</div>
 									<CommandShortcut>↵</CommandShortcut>
 								</CommandItem>
-							))}
-						</CommandGroup>
-					)}
+							))
+						)}
+					</CommandGroup>
 				</CommandList>
 			</Command>
 

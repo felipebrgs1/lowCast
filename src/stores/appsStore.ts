@@ -4,7 +4,7 @@ import { create } from "zustand";
 export interface Application {
 	name: string;
 	exec: string;
-	icon: string | null;
+	icon: string;
 	iconDataUrl?: string | null;
 	description: string | null;
 	desktop_file: string;
@@ -30,14 +30,19 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 	searchQuery: "",
 
 	loadApplications: async () => {
+		console.log("[AppsStore] Loading applications...");
 		set({ isLoading: true });
 		try {
 			const apps = await invoke<Application[]>("list_applications");
+			console.log("[AppsStore] Received apps from Rust:", apps.length, apps);
 
 			// Carregar os data URLs dos ícones em paralelo
 			const appsWithIcons = await Promise.all(
 				apps.map(async (app) => {
-					if (app.icon) {
+					// Validar se o ícone é válido (não vazio, não apenas vírgula e índice)
+					const hasValidIcon = app.icon && app.icon.trim() && !app.icon.startsWith(",");
+
+					if (hasValidIcon) {
 						try {
 							const dataUrl = await invoke<string>("get_icon_data_url", {
 								iconPath: app.icon,
@@ -53,9 +58,10 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 				}),
 			);
 
+			console.log("[AppsStore] Apps with icons loaded:", appsWithIcons.length);
 			set({ applications: appsWithIcons, filteredApps: appsWithIcons });
 		} catch (error) {
-			console.error("Erro ao carregar aplicativos:", error);
+			console.error("[AppsStore] Erro ao carregar aplicativos:", error);
 		} finally {
 			set({ isLoading: false });
 		}
