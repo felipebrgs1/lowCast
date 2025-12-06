@@ -1,4 +1,3 @@
-import { Image } from "@tauri-apps/api/image";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import * as clipboard from "@tauri-apps/plugin-clipboard-manager";
 import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
@@ -159,10 +158,9 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 			} else {
 				// Ler o arquivo de imagem
 				const imageBytes = await readFile(entry.content);
-				// Criar objeto Image do Tauri
-				const image = await Image.fromBytes(imageBytes);
-				// Escrever imagem no clipboard
-				await clipboard.writeImage(image);
+				// Escrever imagem no clipboard diretamente com os bytes
+				// (evita conflito de tipos entre versões diferentes de @tauri-apps/api)
+				await clipboard.writeImage(imageBytes);
 			}
 		} catch (error) {
 			console.error("[Clipboard] Error copying to clipboard:", error);
