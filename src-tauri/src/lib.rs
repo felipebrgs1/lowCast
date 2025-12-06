@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -489,7 +490,7 @@ fn extract_windows_icon(icon_path: &str) -> Result<String, String> {
         return Err(format!("Icon file not found: {}", exe_path));
     }
 
-    let icon_index = parts.get(1)
+    let _icon_index = parts.get(1)
         .and_then(|s| s.trim().parse::<i32>().ok())
         .unwrap_or(0);
 
@@ -543,6 +544,103 @@ fn extract_windows_icon(icon_path: &str) -> Result<String, String> {
     }
 
     Ok(format!("data:image/png;base64,{}", base64_data))
+}
+
+/// Extract multiple icons in a single PowerShell call for better performance
+#[tauri::command]
+#[cfg(target_os = "windows")]
+fn get_icons_batch(icon_paths: Vec<String>) -> Vec<Option<String>> {
+    use std::os::windows::process::CommandExt;
+    
+    if icon_paths.is_empty() {
+        return Vec::new();
+    }
+    
+    eprintln!("[Rust] Extracting {} icons in batch", icon_paths.len());
+    
+    // Build JSON array of paths for PowerShell
+    let paths_json: Vec<String> = icon_paths.iter()
+        .map(|p| {
+            let parts: Vec<&str> = p.split(',').collect();
+            let exe_path = parts[0].trim();
+            format!("\"{}\"", exe_path.replace("\\", "\\\\").replace("\"", "\\\""))
+        })
+        .collect();
+    
+    let ps_script = format!(
+        r#"
+        Add-Type -AssemblyName System.Drawing
+        $paths = @({})
+        $results = @()
+        foreach ($path in $paths) {{
+            try {{
+                if (-not (Test-Path $path)) {{
+                    $results += $null
+                    continue
+                }}
+                if ($path -match '\.ico$') {{
+                    $bytes = [System.IO.File]::ReadAllBytes($path)
+                    $results += [Convert]::ToBase64String($bytes)
+                }} else {{
+                    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path)
+                    if ($icon) {{
+                        $bitmap = $icon.ToBitmap()
+                        $ms = New-Object System.IO.MemoryStream
+                        $bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+                        $bytes = $ms.ToArray()
+                        $ms.Close()
+                        $bitmap.Dispose()
+                        $icon.Dispose()
+                        $results += [Convert]::ToBase64String($bytes)
+                    }} else {{
+                        $results += $null
+                    }}
+                }}
+            }} catch {{
+                $results += $null
+            }}
+        }}
+        $results | ConvertTo-Json -Compress
+        "#,
+        paths_json.join(",")
+    );
+    
+    let output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-Command",
+            &ps_script
+        ])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    
+    match output {
+        Ok(output) => {
+            let json_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            
+            // Parse the JSON array
+            if let Ok(results) = serde_json::from_str::<Vec<Option<String>>>(&json_str) {
+                eprintln!("[Rust] Successfully extracted {} icons", results.iter().filter(|x| x.is_some()).count());
+                return results.into_iter()
+                    .map(|opt| opt.map(|b64| format!("data:image/png;base64,{}", b64)))
+                    .collect();
+            }
+            
+            // If it's a single value (not array), handle that case
+            if let Ok(single) = serde_json::from_str::<Option<String>>(&json_str) {
+                return vec![single.map(|b64| format!("data:image/png;base64,{}", b64))];
+            }
+            
+            eprintln!("[Rust] Failed to parse icons JSON: {}", &json_str[..json_str.len().min(200)]);
+        }
+        Err(e) => {
+            eprintln!("[Rust] Failed to execute PowerShell for batch icons: {}", e);
+        }
+    }
+    
+    // Return empty results on failure
+    vec![None; icon_paths.len()]
 }
 
 fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {
@@ -637,7 +735,8 @@ pub fn run() {
             show_window,
             hide_window,
             toggle_window,
-            get_icon_data_url
+            get_icon_data_url,
+            get_icons_batch
         ])
         .setup(|app| {
             // Posicionar a janela
