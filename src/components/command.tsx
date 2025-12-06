@@ -79,7 +79,7 @@ export function CommandEmpty({ children }: CommandEmptyProps) {
 
 interface CommandGroupProps {
 	children: ComponentChildren;
-	heading?: string;
+	heading?: ComponentChildren;
 }
 
 export function CommandGroup({ children, heading }: CommandGroupProps) {

@@ -20,6 +20,7 @@ interface AppsState {
 
 	// Actions
 	loadApplications: () => Promise<void>;
+	refreshApplications: () => Promise<void>;
 	search: (query: string) => void;
 	launchApp: (app: Application) => Promise<void>;
 }
@@ -147,6 +148,66 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 			set({ applications: appsWithIcons, filteredApps: appsWithIcons, loadingProgress: 100 });
 		} catch (error) {
 			console.error("[AppsStore] Erro ao carregar aplicativos:", error);
+		} finally {
+			set({ isLoading: false });
+		}
+	},
+
+	refreshApplications: async () => {
+		console.log("[AppsStore] Force refreshing applications...");
+		set({ isLoading: true, loadingProgress: 0 });
+
+		try {
+			// Clear icon cache
+			iconCache.clear();
+
+			// Call Rust command that forces refresh
+			const apps = await invoke<Application[]>("refresh_applications");
+			console.log("[AppsStore] Refreshed apps from Rust:", apps.length);
+
+			// Show apps immediately without icons
+			const appsWithoutIcons = apps.map((app) => ({ ...app, iconDataUrl: null }));
+			set({ applications: appsWithoutIcons, filteredApps: appsWithoutIcons, loadingProgress: 20 });
+
+			// Load icons in batch
+			const appsWithValidIcons: { app: Application; index: number }[] = [];
+			apps.forEach((app, index) => {
+				const iconTrimmed = app.icon?.trim() || "";
+				const hasValidIcon =
+					iconTrimmed.length > 0 &&
+					!iconTrimmed.startsWith(",") &&
+					/[a-zA-Z]/.test(iconTrimmed) &&
+					(iconTrimmed.includes("\\") ||
+						iconTrimmed.includes("/") ||
+						/\.(exe|dll|ico|png|jpg|svg)$/i.test(iconTrimmed));
+
+				if (hasValidIcon) {
+					appsWithValidIcons.push({ app, index });
+				}
+			});
+
+			const appsWithIcons: Application[] = [...appsWithoutIcons];
+
+			if (appsWithValidIcons.length > 0) {
+				const iconPaths = appsWithValidIcons.map(({ app }) => app.icon);
+				set({ loadingProgress: 40 });
+
+				try {
+					const iconResults = await invoke<(string | null)[]>("get_icons_batch", { iconPaths });
+
+					iconResults.forEach((iconDataUrl, i) => {
+						const { app, index } = appsWithValidIcons[i];
+						addToIconCache(app.icon, iconDataUrl ?? null);
+						appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: iconDataUrl ?? null };
+					});
+				} catch (batchError) {
+					console.warn("[AppsStore] Batch icon loading failed:", batchError);
+				}
+			}
+
+			set({ applications: appsWithIcons, filteredApps: appsWithIcons, loadingProgress: 100 });
+		} catch (error) {
+			console.error("[AppsStore] Erro ao atualizar aplicativos:", error);
 		} finally {
 			set({ isLoading: false });
 		}

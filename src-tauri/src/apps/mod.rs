@@ -2,6 +2,7 @@
 //!
 //! This module handles listing installed applications on Linux and Windows.
 
+pub mod cache;
 pub mod icons;
 
 #[cfg(target_os = "linux")]
@@ -23,9 +24,8 @@ pub struct Application {
     pub categories: Vec<String>,
 }
 
-/// List all installed applications
-#[tauri::command]
-pub fn list_applications() -> Vec<Application> {
+/// Internal function to scan applications from the system
+fn scan_applications() -> Vec<Application> {
     #[cfg(target_os = "linux")]
     {
         linux::list_applications_linux()
@@ -40,6 +40,41 @@ pub fn list_applications() -> Vec<Application> {
     {
         Vec::new()
     }
+}
+
+/// List all installed applications (uses cache if available)
+#[tauri::command]
+pub fn list_applications() -> Vec<Application> {
+    // Try to load from cache first
+    if let Some(cached) = cache::load_cached_applications() {
+        return cached;
+    }
+
+    // No cache or invalid, scan fresh
+    eprintln!("[Apps] Scanning applications...");
+    let apps = scan_applications();
+
+    // Save to cache for next time
+    cache::save_applications_to_cache(&apps);
+
+    apps
+}
+
+/// Force refresh the application list (ignores cache)
+#[tauri::command]
+pub fn refresh_applications() -> Vec<Application> {
+    eprintln!("[Apps] Force refreshing applications...");
+
+    // Clear existing cache
+    cache::clear_cache();
+
+    // Scan fresh
+    let apps = scan_applications();
+
+    // Save to cache
+    cache::save_applications_to_cache(&apps);
+
+    apps
 }
 
 /// Launch an application by its exec command

@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AppWindow, Clipboard, FileText, Image as ImageIcon } from "lucide-react";
+import { AppWindow, Clipboard, FileText, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
 	Button,
@@ -37,7 +37,14 @@ export function Index(_props: IndexProps) {
 		copyToClipboard,
 	} = useClipboardStore();
 
-	const { filteredApps, loadApplications, search: searchApps, launchApp } = useAppsStore();
+	const {
+		filteredApps,
+		loadApplications,
+		refreshApplications,
+		isLoading,
+		search: searchApps,
+		launchApp,
+	} = useAppsStore();
 
 	// Ref para controlar inicialização única
 	const hasInitialized = useRef(false);
@@ -116,7 +123,25 @@ export function Index(_props: IndexProps) {
 					<CommandSeparator />
 
 					{/* Apps do Sistema (Windows/Linux) */}
-					<CommandGroup heading="Aplicativos do Sistema">
+					<CommandGroup
+						heading={
+							<div className="flex items-center justify-between w-full pr-2">
+								<span>Aplicativos do Sistema</span>
+								<button
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation();
+										refreshApplications();
+									}}
+									disabled={isLoading}
+									className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50"
+									title="Atualizar lista de aplicativos"
+								>
+									<RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+								</button>
+							</div>
+						}
+					>
 						{filteredApps.length === 0 ? (
 							<div className="px-2 py-4 text-center text-sm text-muted-foreground">
 								Carregando aplicativos...

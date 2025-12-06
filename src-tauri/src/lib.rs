@@ -40,6 +40,7 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             apps::list_applications,
+            apps::refresh_applications,
             apps::launch_application,
             apps::icons::get_icon_data_url,
             apps::icons::get_icons_batch,
