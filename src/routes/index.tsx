@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AppWindow, Clipboard, FileText, Image as ImageIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
@@ -65,6 +66,8 @@ export function Index(_props: IndexProps) {
 
 	const handleLaunchApp = async (app: Application) => {
 		await launchApp(app);
+		// Esconder a janela após abrir o app
+		await getCurrentWindow().hide();
 	};
 
 	const handleCopyClipboard = async (entry: ClipboardEntry) => {
