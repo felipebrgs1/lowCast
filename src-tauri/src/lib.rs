@@ -199,28 +199,52 @@ fn list_applications() -> Vec<Application> {
                         $rawIconLocation = $shortcut.IconLocation
 
                         # Determine final icon location
-                        if ([string]::IsNullOrWhiteSpace($rawIconLocation)) {
+                        $iconLocation = $null
+                        if (-not [string]::IsNullOrWhiteSpace($rawIconLocation)) {
+                            # Expand environment variables (e.g., %windir%)
+                            $expanded = [Environment]::ExpandEnvironmentVariables($rawIconLocation)
+                            
+                            # Parse icon location which might be in format "path,index" or "path,-index" or just ",index"
+                            if ($expanded -match '^,') {
+                                # Starts with comma (just index), use target exe
+                                $iconLocation = "$target,0"
+                            } elseif ($expanded -match '^(.+?),(-?\d+)$') {
+                                $iconPath = $Matches[1]
+                                if ($iconPath -and (Test-Path $iconPath -ErrorAction SilentlyContinue)) {
+                                    $iconLocation = $expanded
+                                } else {
+                                    $iconLocation = "$target,0"
+                                }
+                            } elseif ($expanded -match '\.(exe|dll|ico)$') {
+                                if (Test-Path $expanded -ErrorAction SilentlyContinue) {
+                                    $iconLocation = "$expanded,0"
+                                } else {
+                                    $iconLocation = "$target,0"
+                                }
+                            } else {
+                                $iconLocation = "$target,0"
+                            }
+                        } else {
                             # No icon specified in shortcut, use the target exe
                             $iconLocation = "$target,0"
-                        } else {
-                            # Expand environment variables (e.g., %windir%)
-                            $iconLocation = [Environment]::ExpandEnvironmentVariables($rawIconLocation)
+                        }
 
-                            # Parse icon location which might be in format "path,index" or "path,-index"
-                            if ($iconLocation -match '^(.+?),(-?\d+)$') {
-                                # Already has index, keep as is
-                                # No change needed
-                            } elseif ($iconLocation -match '\.(exe|dll|ico)$') {
-                                # Add default index 0 for exe/dll/ico files
-                                $iconLocation = "$iconLocation,0"
+                        # Sanitize name - remove control characters and trim
+                        $appName = $s.BaseName -replace '[\x00-\x1F\x7F]', '' | ForEach-Object { $_.Trim() }
+                        
+                        # Convert empty strings to null for optional fields and sanitize
+                        $descValue = $null
+                        if (-not [string]::IsNullOrWhiteSpace($shortcut.Description)) {
+                            # Remove control characters and trim
+                            $descValue = $shortcut.Description -replace '[\x00-\x1F\x7F]', ''
+                            $descValue = $descValue.Trim()
+                            if ([string]::IsNullOrWhiteSpace($descValue)) {
+                                $descValue = $null
                             }
                         }
 
-                        # Convert empty strings to null for optional fields
-                        $descValue = if ([string]::IsNullOrWhiteSpace($shortcut.Description)) { $null } else { $shortcut.Description }
-
                         $apps += @{
-                            name = $s.BaseName
+                            name = $appName
                             exec = $target
                             icon = $iconLocation
                             description = $descValue
