@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppWindow, Clipboard, FileText, Image as ImageIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	Command,
 	CommandEmpty,
@@ -11,12 +11,7 @@ import {
 	CommandSeparator,
 	CommandShortcut,
 } from "@/components/ui/command";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ClipboardEntry } from "@/lib/database";
 import { type Application, useAppsStore } from "@/stores/appsStore";
@@ -40,7 +35,14 @@ function Index() {
 
 	const { filteredApps, loadApplications, search: searchApps, launchApp } = useAppsStore();
 
+	// Ref para controlar inicialização única
+	const hasInitialized = useRef(false);
+
+	// Inicialização - executar apenas uma vez
 	useEffect(() => {
+		if (hasInitialized.current) return;
+		hasInitialized.current = true;
+
 		loadHistory();
 		loadApplications();
 		startListening();
@@ -50,14 +52,13 @@ function Index() {
 		};
 	}, [loadHistory, loadApplications, startListening, stopListening]);
 
-	useEffect(() => {
-		searchApps(query);
-	}, [query, searchApps]);
+	// Busca reativa
+	const searchAppsRef = useRef(searchApps);
+	searchAppsRef.current = searchApps;
 
-	// Debug: verificar estado dos apps
 	useEffect(() => {
-		console.log("filteredApps:", filteredApps.length, filteredApps);
-	}, [filteredApps]);
+		searchAppsRef.current(query);
+	}, [query]);
 
 	const handleLaunchApp = async (app: Application) => {
 		await launchApp(app);
@@ -154,7 +155,10 @@ function Index() {
 			</Command>
 
 			{/* Dialog do Histórico do Clipboard */}
-			<Dialog open={clipboardDialogOpen} onOpenChange={setClipboardDialogOpen}>
+			<Dialog
+				open={clipboardDialogOpen}
+				onOpenChange={setClipboardDialogOpen}
+			>
 				<DialogContent className="max-w-2xl max-h-[80vh]">
 					<DialogHeader>
 						<DialogTitle>Histórico do Clipboard</DialogTitle>
@@ -168,10 +172,11 @@ function Index() {
 								</div>
 							) : (
 								clipboardEntries.map((entry) => (
-									<div
+									<button
+										type="button"
 										key={entry.id}
 										onClick={() => handleCopyClipboard(entry)}
-										className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
+										className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors w-full text-left"
 									>
 										<div className="flex h-10 w-10 items-center justify-center rounded bg-muted/50">
 											{entry.content_type === "text" ? (
@@ -190,7 +195,7 @@ function Index() {
 												{new Date(entry.created_at).toLocaleString()}
 											</span>
 										</div>
-									</div>
+									</button>
 								))
 							)}
 						</div>

@@ -1,4 +1,3 @@
-import { Image } from "@tauri-apps/api/image";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import * as clipboard from "@tauri-apps/plugin-clipboard-manager";
 import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
@@ -68,6 +67,18 @@ async function saveImageToFile(base64Data: string): Promise<string> {
 
 let clipboardInterval: ReturnType<typeof setInterval> | null = null;
 let lastClipboardContent = "";
+// Canvas reutilizável para evitar leak de memória
+let reusableCanvas: HTMLCanvasElement | null = null;
+let reusableCtx: CanvasRenderingContext2D | null = null;
+
+function getReusableCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+	if (!reusableCanvas) {
+		reusableCanvas = document.createElement("canvas");
+		reusableCtx = reusableCanvas.getContext("2d");
+	}
+	if (!reusableCtx) return null;
+	return { canvas: reusableCanvas, ctx: reusableCtx };
+}
 
 export const useClipboardStore = create<ClipboardState>((set, get) => ({
 	entries: [],
@@ -147,10 +158,9 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 			} else {
 				// Ler o arquivo de imagem
 				const imageBytes = await readFile(entry.content);
-				// Criar objeto Image do Tauri
-				const image = await Image.fromBytes(imageBytes);
-				// Escrever imagem no clipboard
-				await clipboard.writeImage(image);
+				// Escrever imagem no clipboard diretamente com os bytes
+				// (evita conflito de tipos entre versões diferentes de @tauri-apps/api)
+				await clipboard.writeImage(imageBytes);
 			}
 		} catch (error) {
 			console.error("[Clipboard] Error copying to clipboard:", error);
@@ -186,15 +196,15 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 					try {
 						const image = await clipboard.readImage();
 						if (image) {
-							// Converter para base64 PNG
+							// Converter para base64 PNG usando canvas reutilizável
 							const size = await image.size();
 							const rgba = await image.rgba();
 
-							const canvas = document.createElement("canvas");
-							canvas.width = size.width;
-							canvas.height = size.height;
-							const ctx = canvas.getContext("2d");
-							if (ctx) {
+							const canvasResult = getReusableCanvas();
+							if (canvasResult) {
+								const { canvas, ctx } = canvasResult;
+								canvas.width = size.width;
+								canvas.height = size.height;
 								const imageData = new ImageData(new Uint8ClampedArray(rgba), size.width, size.height);
 								ctx.putImageData(imageData, 0, 0);
 								const dataUrl = canvas.toDataURL("image/png");
@@ -210,6 +220,9 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 									await get().addEntry("image", base64);
 									console.log("[Clipboard] Image entry saved!");
 								}
+
+								// Limpar o contexto para liberar memória
+								ctx.clearRect(0, 0, canvas.width, canvas.height);
 							}
 						}
 					} catch (_e) {
@@ -229,6 +242,12 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 			clearInterval(clipboardInterval);
 			clipboardInterval = null;
 		}
+		// Limpar canvas reutilizável para liberar memória
+		if (reusableCanvas && reusableCtx) {
+			reusableCtx.clearRect(0, 0, reusableCanvas.width, reusableCanvas.height);
+		}
+		// Limpar lastClipboardContent para evitar retenção de strings grandes
+		lastClipboardContent = "";
 		set({ isListening: false });
 	},
 }));
