@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "preact/hooks";
 
 export function useGlobalShortcut(shortcut = "Alt+Space") {
 	const isRegisteredRef = useRef(false);

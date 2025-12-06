@@ -1,22 +1,13 @@
-import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
+import path from "node:path";
+import preact from "@preact/preset-vite";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
-import path from "node:path";
-import tailwindcss from "@tailwindcss/vite";
-
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-	plugins: [
-		tanstackRouter({
-			target: "react",
-			autoCodeSplitting: true,
-		}),
-		react(),
-		tailwindcss(),
-	],
+export default defineConfig({
+	plugins: [preact(), tailwindcss()],
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
@@ -44,4 +35,4 @@ export default defineConfig(async () => ({
 			ignored: ["**/src-tauri/**"],
 		},
 	},
-}));
+});
