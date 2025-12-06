@@ -25,7 +25,23 @@ interface AppsState {
 }
 
 // Cache de ícones em memória para evitar re-extrações
+// Limite máximo de ícones no cache para evitar leak de memória
+const MAX_ICON_CACHE_SIZE = 100;
 const iconCache = new Map<string, string | null>();
+
+// Função para adicionar ao cache com limite LRU simples
+function addToIconCache(key: string, value: string | null) {
+	// Se já existe, deletar e re-adicionar (move para o final - mais recente)
+	if (iconCache.has(key)) {
+		iconCache.delete(key);
+	}
+	// Se atingiu o limite, remover os mais antigos
+	while (iconCache.size >= MAX_ICON_CACHE_SIZE) {
+		const firstKey = iconCache.keys().next().value;
+		if (firstKey) iconCache.delete(firstKey);
+	}
+	iconCache.set(key, value);
+}
 
 export const useAppsStore = create<AppsState>((set, get) => ({
 	applications: [],
@@ -96,7 +112,7 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 					// Atualizar cache e apps
 					iconResults.forEach((iconDataUrl, i) => {
 						const { app, index } = appsWithValidIcons[i];
-						iconCache.set(app.icon, iconDataUrl ?? null);
+						addToIconCache(app.icon, iconDataUrl ?? null);
 						appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: iconDataUrl ?? null };
 					});
 				} catch (batchError) {
@@ -112,10 +128,10 @@ export const useAppsStore = create<AppsState>((set, get) => ({
 							const dataUrl = await invoke<string>("get_icon_data_url", {
 								iconPath: app.icon,
 							});
-							iconCache.set(app.icon, dataUrl);
+							addToIconCache(app.icon, dataUrl);
 							appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: dataUrl };
 						} catch {
-							iconCache.set(app.icon, null);
+							addToIconCache(app.icon, null);
 						}
 
 						// Atualizar progresso
