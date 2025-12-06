@@ -7,8 +7,7 @@ interface TabsProps {
 	className?: string;
 }
 
-// Simples implementação sem context para Preact
-export function Tabs({ children, defaultValue: _defaultValue = "", className }: TabsProps) {
+export function Tabs({ children, className }: TabsProps) {
 	return <div className={cn("", className)}>{children}</div>;
 }
 

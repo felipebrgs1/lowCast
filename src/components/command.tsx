@@ -38,9 +38,8 @@ export function CommandInput({ value, onValueChange, placeholder, className }: C
 				viewBox="0 0 24 24"
 				strokeWidth={2}
 				stroke="currentColor"
-				aria-labelledby="search-icon-title"
+				aria-hidden="true"
 			>
-				<title id="search-icon-title">Search</title>
 				<path
 					strokeLinecap="round"
 					strokeLinejoin="round"

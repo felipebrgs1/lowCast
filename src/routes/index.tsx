@@ -1,6 +1,7 @@
 import { AppWindow, Clipboard, FileText, Image as ImageIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
+	Button,
 	Command,
 	CommandEmpty,
 	CommandGroup,
@@ -9,9 +10,12 @@ import {
 	CommandList,
 	CommandSeparator,
 	CommandShortcut,
-} from "@/components/ui/command";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	ScrollArea,
+} from "@/components";
 import type { ClipboardEntry } from "@/lib/database";
 import { type Application, useAppsStore } from "@/stores/appsStore";
 import { useClipboardStore } from "@/stores/clipboardStore";
@@ -175,11 +179,11 @@ export function Index(_props: IndexProps) {
 								</div>
 							) : (
 								clipboardEntries.map((entry) => (
-									<button
-										type="button"
+									<Button
 										key={entry.id}
+										variant="ghost"
 										onClick={() => handleCopyClipboard(entry)}
-										className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors w-full text-left"
+										className="flex items-center gap-3 p-3 h-auto rounded-lg w-full justify-start"
 									>
 										<div className="flex h-10 w-10 items-center justify-center rounded bg-muted/50">
 											{entry.content_type === "text" ? (
@@ -188,7 +192,7 @@ export function Index(_props: IndexProps) {
 												<ImageIcon className="h-5 w-5 text-muted-foreground" />
 											)}
 										</div>
-										<div className="flex flex-col flex-1 min-w-0">
+										<div className="flex flex-col flex-1 min-w-0 text-left">
 											<span className="font-medium truncate">
 												{entry.content_type === "text"
 													? (entry.preview || entry.content).replace(/\n/g, " ")
@@ -198,7 +202,7 @@ export function Index(_props: IndexProps) {
 												{new Date(entry.created_at).toLocaleString()}
 											</span>
 										</div>
-									</button>
+									</Button>
 								))
 							)}
 						</div>
