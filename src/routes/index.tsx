@@ -1,6 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { AppWindow, Clipboard, FileText, Image as ImageIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "preact/hooks";
 import {
 	Command,
 	CommandEmpty,
@@ -17,11 +16,11 @@ import type { ClipboardEntry } from "@/lib/database";
 import { type Application, useAppsStore } from "@/stores/appsStore";
 import { useClipboardStore } from "@/stores/clipboardStore";
 
-export const Route = createFileRoute("/")({
-	component: Index,
-});
+interface IndexProps {
+	path?: string;
+}
 
-function Index() {
+export function Index(_props: IndexProps) {
 	const [query, setQuery] = useState("");
 	const [clipboardDialogOpen, setClipboardDialogOpen] = useState(false);
 
@@ -82,7 +81,9 @@ function Index() {
 					className="text-lg h-14 border-none focus:ring-0"
 				/>
 				<CommandList className="max-h-[calc(100vh-3.5rem)] pb-2">
-					<CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+					{query.trim() !== "" && filteredApps.length === 0 && (
+						<CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+					)}
 
 					{/* Apps Nativos do lowCast */}
 					<CommandGroup heading="Apps">
@@ -128,8 +129,10 @@ function Index() {
 													alt={app.name}
 													className="h-6 w-6 object-contain"
 													onError={(e) => {
-														e.currentTarget.style.display = "none";
-														e.currentTarget.nextElementSibling?.classList.remove("hidden");
+														(e.currentTarget as HTMLImageElement).style.display = "none";
+														(
+															e.currentTarget.nextElementSibling as HTMLElement
+														)?.classList.remove("hidden");
 													}}
 												/>
 											) : null}

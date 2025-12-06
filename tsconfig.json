@@ -20,7 +20,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    /* Preact JSX */
     "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
