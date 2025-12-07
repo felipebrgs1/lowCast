@@ -15,11 +15,14 @@
         "title": "lowcast",
         "width": 800,
         "height": 600,
+        "visible": false,
         "decorations": false,
         "transparent": true,
-        "resizable": true,
+        "resizable": false,
         "skipTaskbar": true,
-        "alwaysOnTop": true
+        "alwaysOnTop": true,
+        "center": true,
+        "focus": true
       }
     ],
     "security": {
@@ -27,6 +30,8 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
+          "$APPDATA/**",
+          "$APPDATA/../**",
           "/usr/share/pixmaps/**",
           "/usr/share/icons/**",
           "/usr/share/gpsd/**",

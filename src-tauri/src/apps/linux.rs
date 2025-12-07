@@ -21,28 +21,108 @@ fn resolve_icon_path(icon_name: &str) -> Option<String> {
         .trim_end_matches(".svg")
         .trim_end_matches(".xpm");
 
-    // Diretórios comuns de ícones (em ordem de prioridade)
-    let icon_paths = [
-        format!("/usr/share/pixmaps/{}.png", icon_base),
-        format!("/usr/share/pixmaps/{}.svg", icon_base),
-        format!("/usr/share/pixmaps/{}.xpm", icon_base),
-        format!("/usr/share/icons/hicolor/48x48/apps/{}.png", icon_base),
-        format!("/usr/share/icons/hicolor/64x64/apps/{}.png", icon_base),
-        format!("/usr/share/icons/hicolor/128x128/apps/{}.png", icon_base),
-        format!("/usr/share/icons/hicolor/scalable/apps/{}.svg", icon_base),
+    let home = std::env::var("HOME").unwrap_or_default();
+
+    // Temas populares de ícones
+    let themes = [
+        "hicolor",
+        "Papirus",
+        "Papirus-Dark",
+        "Adwaita",
+        "breeze",
+        "breeze-dark",
+        "gnome",
+        "elementary",
+        "Numix",
+        "Numix-Circle",
+        "Tela",
+        "Tela-circle",
+        "Flat-Remix",
+    ];
+
+    // Tamanhos em ordem de preferência (maiores primeiro para melhor qualidade)
+    let sizes = [
+        "256x256", "128x128", "96x96", "64x64", "48x48", "32x32", "scalable",
+    ];
+
+    // Extensões
+    let extensions = ["png", "svg", "xpm"];
+
+    // Diretórios base de ícones
+    let icon_dirs = [
+        "/usr/share/icons".to_string(),
+        format!("{}/.local/share/icons", home),
+        format!("{}/.icons", home),
+        "/usr/share/pixmaps".to_string(),
+    ];
+
+    // Primeiro: tentar pixmaps (ícones não temáticos)
+    for ext in &extensions {
+        let path = format!("/usr/share/pixmaps/{}.{}", icon_base, ext);
+        if Path::new(&path).exists() {
+            return Some(path);
+        }
+    }
+
+    // Segundo: buscar em temas de ícones
+    for icon_dir in &icon_dirs {
+        for theme in &themes {
+            for size in &sizes {
+                let category = if *size == "scalable" {
+                    "scalable"
+                } else {
+                    size
+                };
+                for ext in &extensions {
+                    // Tentar categoria "apps"
+                    let path = format!(
+                        "{}/{}/{}/apps/{}.{}",
+                        icon_dir, theme, category, icon_base, ext
+                    );
+                    if Path::new(&path).exists() {
+                        return Some(path);
+                    }
+
+                    // Tentar categoria "applications"
+                    let path = format!(
+                        "{}/{}/{}/applications/{}.{}",
+                        icon_dir, theme, category, icon_base, ext
+                    );
+                    if Path::new(&path).exists() {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Terceiro: Flatpak icons
+    let flatpak_paths = [
         format!(
-            "{}/.local/share/icons/hicolor/48x48/apps/{}.png",
-            std::env::var("HOME").unwrap_or_default(),
+            "/var/lib/flatpak/exports/share/icons/hicolor/128x128/apps/{}.png",
             icon_base
         ),
         format!(
-            "{}/.local/share/icons/hicolor/scalable/apps/{}.svg",
-            std::env::var("HOME").unwrap_or_default(),
+            "/var/lib/flatpak/exports/share/icons/hicolor/scalable/apps/{}.svg",
             icon_base
+        ),
+        format!(
+            "{}/.local/share/flatpak/exports/share/icons/hicolor/128x128/apps/{}.png",
+            home, icon_base
+        ),
+        format!(
+            "{}/.local/share/flatpak/exports/share/icons/hicolor/scalable/apps/{}.svg",
+            home, icon_base
         ),
     ];
 
-    icon_paths.into_iter().find(|path| Path::new(path).exists())
+    for path in flatpak_paths {
+        if Path::new(&path).exists() {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 /// Parse a .desktop file and return Application if valid

@@ -3,6 +3,8 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use std::fs;
 use std::io::Read;
+
+#[cfg(target_os = "windows")]
 use std::path::Path;
 
 /// Get icon data URL for a single icon
@@ -212,9 +214,18 @@ pub fn get_icons_batch(icon_paths: Vec<String>) -> Vec<Option<String>> {
     vec![None; icon_paths.len()]
 }
 
-/// Stub for non-Windows platforms
+/// Load multiple icons on Linux using get_icon_data_url
 #[tauri::command]
 #[cfg(not(target_os = "windows"))]
-pub fn get_icons_batch(_icon_paths: Vec<String>) -> Vec<Option<String>> {
-    Vec::new()
+pub fn get_icons_batch(icon_paths: Vec<String>) -> Vec<Option<String>> {
+    icon_paths
+        .into_iter()
+        .map(|path| {
+            if path.is_empty() {
+                None
+            } else {
+                get_icon_data_url(path).ok()
+            }
+        })
+        .collect()
 }

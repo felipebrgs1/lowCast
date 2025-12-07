@@ -5,10 +5,20 @@ use tauri::{Emitter, Manager};
 /// Process command line arguments for single-instance handling
 pub fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {
     if args.len() <= 1 {
-        // Sem argumentos, apenas mostrar a janela
+        // Sem argumentos, fazer toggle da janela (comportamento padrão)
         if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
+            if let Ok(is_visible) = window.is_visible() {
+                if is_visible {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            } else {
+                // Em caso de erro, tentar mostrar
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
         }
         return;
     }
