@@ -6,6 +6,7 @@ mod apps;
 mod cli;
 mod encoding;
 mod image;
+mod layer_shell;
 mod window;
 
 use tauri::menu::{Menu, MenuItem};
@@ -52,6 +53,13 @@ pub fn run() {
             image::rgba_to_png,
         ])
         .setup(|app| {
+            // === LAYER SHELL (Wayland Overlay) ===
+            // Configura a janela como overlay nativo no Wayland (como Wofi)
+            if let Err(e) = layer_shell::setup_layer_shell(app) {
+                eprintln!("[layer-shell] Failed to setup: {}", e);
+                // Continue with normal window mode
+            }
+
             // === SYSTEM TRAY ===
             // Criar menu para o tray
             let show_item = MenuItem::with_id(app, "show", "Mostrar (Alt+C)", true, None::<&str>)?;
