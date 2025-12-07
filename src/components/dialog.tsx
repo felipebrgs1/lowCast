@@ -38,7 +38,7 @@ export function Dialog(props: DialogProps) {
 	return (
 		<dialog
 			ref={dialogRef}
-			class="backdrop:bg-black/50 rounded-lg p-0 bg-background border border-border shadow-lg"
+			class=" rounded-lg p-0 bg-background border border-border shadow-lg"
 			onClose={() => props.onOpenChange(false)}
 			onClick={handleBackdropClick}
 			onKeyDown={handleKeyDown}

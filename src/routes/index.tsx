@@ -106,7 +106,7 @@ function IndexPage() {
 	};
 
 	return (
-		<div class="h-full w-full bg-background/85 backdrop-blur-xl">
+		<div class="h-full w-full">
 			<Show when={activeView() === "apps"}>
 				<Command
 					shouldFilter={false}
@@ -384,7 +384,7 @@ function IndexPage() {
 				<div
 					role="dialog"
 					tabIndex={-1}
-					class="fixed inset-0 z-50 flex items-center justify-center  backdrop-blur-sm"
+					class="fixed inset-0 z-50 flex items-center justify-center "
 					onClick={() => setExpandedImage(null)}
 					onKeyDown={(e) => e.key === "Escape" && setExpandedImage(null)}
 				>
@@ -402,7 +402,7 @@ function IndexPage() {
 					<img
 						src={expandedImage() ?? ""}
 						alt="Imagem expandida"
-						class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl pointer-events-none"
+						class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg  pointer-events-none"
 					/>
 				</div>
 			</Show>
