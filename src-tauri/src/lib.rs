@@ -7,6 +7,7 @@ mod cli;
 mod encoding;
 mod image;
 mod layer_shell;
+mod screenshot;
 mod window;
 
 use tauri::menu::{Menu, MenuItem};
@@ -51,6 +52,14 @@ pub fn run() {
             window::toggle_window,
             image::compress_png,
             image::rgba_to_png,
+            screenshot::screenshot_fullscreen,
+            screenshot::screenshot_select_region,
+            screenshot::screenshot_area,
+            screenshot::screenshot_monitor,
+            screenshot::list_monitors,
+            screenshot::get_screenshot_capabilities,
+            screenshot::copy_screenshot_to_clipboard,
+            screenshot::open_screenshots_folder,
         ])
         .setup(|app| {
             // === LAYER SHELL (Wayland Overlay) ===

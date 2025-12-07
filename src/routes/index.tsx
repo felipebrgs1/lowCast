@@ -9,7 +9,9 @@ import {
 	Copy,
 	FileText,
 	Image as ImageIcon,
+	Monitor,
 	RefreshCw,
+	Scissors,
 	Trash2,
 	X,
 } from "lucide-solid";
@@ -45,6 +47,13 @@ import {
 	startListening,
 	stopListening,
 } from "@/stores/clipboardStore";
+import {
+	copyLastScreenshotToClipboard,
+	loadCapabilities,
+	setupCliScreenshotListener,
+	takeFullscreenScreenshot,
+	takeRegionScreenshot,
+} from "@/stores/screenshotStore";
 
 export const Route = createFileRoute("/")({
 	component: IndexPage,
@@ -67,11 +76,16 @@ function IndexPage() {
 		loadHistory();
 		loadApplications();
 		startListening();
+		loadCapabilities();
 	});
+
+	// Setup CLI screenshot listener
+	const cleanupScreenshotListener = setupCliScreenshotListener();
 
 	// Cleanup
 	onCleanup(() => {
 		stopListening();
+		cleanupScreenshotListener();
 	});
 
 	// Busca reativa
@@ -84,6 +98,31 @@ function IndexPage() {
 		// Esconder a janela após abrir o app
 		if (isTauri()) {
 			await getCurrentWindow().hide();
+		}
+	};
+
+	// Screenshot tela cheia: captura e copia para clipboard
+	const handleScreenshotFullscreen = async () => {
+		if (isTauri()) {
+			await getCurrentWindow().hide();
+			// Pequeno delay para a janela esconder
+			await new Promise((r) => setTimeout(r, 100));
+			const result = await takeFullscreenScreenshot();
+			if (result) {
+				await copyLastScreenshotToClipboard();
+			}
+		}
+	};
+
+	// Screenshot região: usa slurp/nativo e copia para clipboard
+	const handleScreenshotRegion = async () => {
+		if (isTauri()) {
+			await getCurrentWindow().hide();
+			await new Promise((r) => setTimeout(r, 100));
+			const result = await takeRegionScreenshot();
+			if (result) {
+				await copyLastScreenshotToClipboard();
+			}
 		}
 	};
 
@@ -138,6 +177,36 @@ function IndexPage() {
 										<span class="text-xs text-muted-foreground">
 											{clipboardStore.entries.length} itens no histórico
 										</span>
+									</div>
+								</div>
+								<CommandShortcut>↵</CommandShortcut>
+							</CommandItem>
+							<CommandItem
+								onSelect={handleScreenshotFullscreen}
+								class="h-12"
+							>
+								<div class="flex items-center gap-3 w-full">
+									<div class="flex h-8 w-8 items-center justify-center rounded bg-blue-500/10">
+										<Monitor class="h-5 w-5 text-blue-500" />
+									</div>
+									<div class="flex flex-col">
+										<span class="font-medium">Print Tela Cheia</span>
+										<span class="text-xs text-muted-foreground">Captura e copia para Ctrl+V</span>
+									</div>
+								</div>
+								<CommandShortcut>↵</CommandShortcut>
+							</CommandItem>
+							<CommandItem
+								onSelect={handleScreenshotRegion}
+								class="h-12"
+							>
+								<div class="flex items-center gap-3 w-full">
+									<div class="flex h-8 w-8 items-center justify-center rounded bg-green-500/10">
+										<Scissors class="h-5 w-5 text-green-500" />
+									</div>
+									<div class="flex flex-col">
+										<span class="font-medium">Print Região</span>
+										<span class="text-xs text-muted-foreground">Seleciona área e copia</span>
 									</div>
 								</div>
 								<CommandShortcut>↵</CommandShortcut>

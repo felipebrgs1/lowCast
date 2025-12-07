@@ -52,6 +52,7 @@ bun run lint          # Lint (safe fixes)
 **Icons**: `get_icon_data_url`, `get_icons_batch`
 **Window**: `show_window`, `hide_window`, `toggle_window`
 **Image**: `compress_png`, `rgba_to_png`
+**Screenshot**: `screenshot_fullscreen`, `screenshot_select_region`, `screenshot_area`, `screenshot_monitor`, `list_monitors`, `get_screenshot_capabilities`, `copy_screenshot_to_clipboard`, `open_screenshots_folder`
 
 ## SolidJS Patterns
 
