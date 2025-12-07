@@ -1,12 +1,14 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { useEffect, useRef } from "preact/hooks";
+import { onCleanup, onMount } from "solid-js";
+import { isTauri } from "@/lib/utils";
 
 export function useGlobalShortcut(shortcut = "Alt+Space") {
-	const isRegisteredRef = useRef(false);
+	let isShortcutRegistered = false;
 
-	useEffect(() => {
+	onMount(() => {
 		const setupShortcut = async () => {
+			if (!isTauri()) return;
 			try {
 				// Verificar se já está registrado
 				const alreadyRegistered = await isRegistered(shortcut);
@@ -29,7 +31,7 @@ export function useGlobalShortcut(shortcut = "Alt+Space") {
 					}
 				});
 
-				isRegisteredRef.current = true;
+				isShortcutRegistered = true;
 				console.log(`Global shortcut ${shortcut} registrado`);
 			} catch (error) {
 				console.error("Erro ao registrar shortcut:", error);
@@ -38,11 +40,11 @@ export function useGlobalShortcut(shortcut = "Alt+Space") {
 
 		setupShortcut();
 
-		return () => {
-			if (isRegisteredRef.current) {
+		onCleanup(() => {
+			if (isShortcutRegistered) {
 				unregister(shortcut).catch(console.error);
-				isRegisteredRef.current = false;
+				isShortcutRegistered = false;
 			}
-		};
-	}, [shortcut]);
+		});
+	});
 }

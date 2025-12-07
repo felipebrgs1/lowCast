@@ -1,6 +1,7 @@
+import { createFileRoute } from "@tanstack/solid-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AppWindow, Clipboard, FileText, Image as ImageIcon, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { AppWindow, Clipboard, FileText, Image as ImageIcon, RefreshCw } from "lucide-solid";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import {
 	Button,
 	Command,
@@ -18,63 +19,52 @@ import {
 	ScrollArea,
 } from "@/components";
 import type { ClipboardEntry } from "@/lib/database";
-import { type Application, useAppsStore } from "@/stores/appsStore";
-import { useClipboardStore } from "@/stores/clipboardStore";
+import { isTauri } from "@/lib/utils";
+import {
+	type Application,
+	appsStore,
+	launchApp,
+	loadApplications,
+	refreshApplications,
+	searchApps,
+} from "@/stores/appsStore";
+import { clipboardStore, copyToClipboard, loadHistory, startListening, stopListening } from "@/stores/clipboardStore";
 
-interface IndexProps {
-	path?: string;
-}
+export const Route = createFileRoute("/")({
+	component: IndexPage,
+});
 
-export function Index(_props: IndexProps) {
-	const [query, setQuery] = useState("");
-	const [clipboardDialogOpen, setClipboardDialogOpen] = useState(false);
-
-	const {
-		entries: clipboardEntries,
-		loadHistory,
-		startListening,
-		stopListening,
-		copyToClipboard,
-	} = useClipboardStore();
-
-	const {
-		filteredApps,
-		loadApplications,
-		refreshApplications,
-		isLoading,
-		search: searchApps,
-		launchApp,
-	} = useAppsStore();
-
-	// Ref para controlar inicialização única
-	const hasInitialized = useRef(false);
+function IndexPage() {
+	const [query, setQuery] = createSignal("");
+	const [clipboardDialogOpen, setClipboardDialogOpen] = createSignal(false);
+	const [hasInitialized, setHasInitialized] = createSignal(false);
 
 	// Inicialização - executar apenas uma vez
-	useEffect(() => {
-		if (hasInitialized.current) return;
-		hasInitialized.current = true;
+	createEffect(() => {
+		if (hasInitialized()) return;
+		setHasInitialized(true);
 
 		loadHistory();
 		loadApplications();
 		startListening();
+	});
 
-		return () => {
-			stopListening();
-		};
-	}, [loadHistory, loadApplications, startListening, stopListening]);
+	// Cleanup
+	onCleanup(() => {
+		stopListening();
+	});
 
 	// Busca reativa
-	const searchAppsRef = useRef(searchApps);
-	searchAppsRef.current = searchApps;
-
-	useEffect(() => {
-		searchAppsRef.current(query);
-	}, [query]);
+	createEffect(() => {
+		searchApps(query());
+	});
 
 	const handleLaunchApp = async (app: Application) => {
 		await launchApp(app);
 		// Esconder a janela após abrir o app
-		await getCurrentWindow().hide();
+		if (isTauri()) {
+			await getCurrentWindow().hide();
+		}
 	};
 
 	const handleCopyClipboard = async (entry: ClipboardEntry) => {
@@ -83,36 +73,36 @@ export function Index(_props: IndexProps) {
 	};
 
 	return (
-		<div className="h-full w-full bg-background/85 backdrop-blur-xl">
+		<div class="h-full w-full bg-background/85 backdrop-blur-xl">
 			<Command
 				shouldFilter={false}
-				className="rounded-none border-0 bg-transparent"
+				class="rounded-none border-0 bg-transparent"
 			>
 				<CommandInput
 					placeholder="Buscar aplicativos..."
-					value={query}
+					value={query()}
 					onValueChange={setQuery}
-					className="text-lg h-14 border-none focus:ring-0"
+					class="text-lg h-14 border-none focus:ring-0"
 				/>
-				<CommandList className="max-h-[calc(100vh-3.5rem)] pb-2">
-					{query.trim() !== "" && filteredApps.length === 0 && (
+				<CommandList class="max-h-[calc(100vh-3.5rem)] pb-2">
+					<Show when={query().trim() !== "" && appsStore.filteredApps.length === 0}>
 						<CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
-					)}
+					</Show>
 
 					{/* Apps Nativos do lowCast */}
 					<CommandGroup heading="Apps">
 						<CommandItem
 							onSelect={() => setClipboardDialogOpen(true)}
-							className="h-12"
+							class="h-12"
 						>
-							<div className="flex items-center gap-3 w-full">
-								<div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
-									<Clipboard className="h-5 w-5 text-muted-foreground" />
+							<div class="flex items-center gap-3 w-full">
+								<div class="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
+									<Clipboard class="h-5 w-5 text-muted-foreground" />
 								</div>
-								<div className="flex flex-col">
-									<span className="font-medium">Clipboard</span>
-									<span className="text-xs text-muted-foreground">
-										{clipboardEntries.length} itens no histórico
+								<div class="flex flex-col">
+									<span class="font-medium">Clipboard</span>
+									<span class="text-xs text-muted-foreground">
+										{clipboardStore.entries.length} itens no histórico
 									</span>
 								</div>
 							</div>
@@ -125,7 +115,7 @@ export function Index(_props: IndexProps) {
 					{/* Apps do Sistema (Windows/Linux) */}
 					<CommandGroup
 						heading={
-							<div className="flex items-center justify-between w-full pr-2">
+							<div class="flex items-center justify-between w-full pr-2">
 								<span>Aplicativos do Sistema</span>
 								<button
 									type="button"
@@ -133,106 +123,117 @@ export function Index(_props: IndexProps) {
 										e.stopPropagation();
 										refreshApplications();
 									}}
-									disabled={isLoading}
-									className="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50"
+									disabled={appsStore.isLoading}
+									class="p-1 rounded hover:bg-muted/50 transition-colors disabled:opacity-50"
 									title="Atualizar lista de aplicativos"
 								>
-									<RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+									<RefreshCw class={`h-3.5 w-3.5 ${appsStore.isLoading ? "animate-spin" : ""}`} />
 								</button>
 							</div>
 						}
 					>
-						{filteredApps.length === 0 ? (
-							<div className="px-2 py-4 text-center text-sm text-muted-foreground">
-								Carregando aplicativos...
-							</div>
-						) : (
-							filteredApps.map((app) => (
-								<CommandItem
-									key={app.desktop_file}
-									onSelect={() => handleLaunchApp(app)}
-									className="h-12"
-								>
-									<div className="flex items-center gap-3 w-full">
-										<div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
-											{app.iconDataUrl ? (
-												<img
-													src={app.iconDataUrl}
-													alt={app.name}
-													className="h-6 w-6 object-contain"
-													onError={(e) => {
-														(e.currentTarget as HTMLImageElement).style.display = "none";
-														(
-															e.currentTarget.nextElementSibling as HTMLElement
-														)?.classList.remove("hidden");
-													}}
-												/>
-											) : null}
-											<AppWindow
-												className={`h-5 w-5 text-muted-foreground ${app.iconDataUrl ? "hidden" : ""}`}
-											/>
+						<Show
+							when={appsStore.filteredApps.length > 0}
+							fallback={
+								<div class="px-2 py-4 text-center text-sm text-muted-foreground">
+									Carregando aplicativos...
+								</div>
+							}
+						>
+							<For each={appsStore.filteredApps}>
+								{(app) => (
+									<CommandItem
+										onSelect={() => handleLaunchApp(app)}
+										class="h-12"
+									>
+										<div class="flex items-center gap-3 w-full">
+											<div class="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
+												<Show
+													when={app.iconDataUrl}
+													fallback={<AppWindow class="h-5 w-5 text-muted-foreground" />}
+												>
+													<img
+														src={app.iconDataUrl ?? undefined}
+														alt={app.name}
+														class="h-6 w-6 object-contain"
+														onError={(e) => {
+															(e.currentTarget as HTMLImageElement).style.display =
+																"none";
+															(
+																e.currentTarget.nextElementSibling as HTMLElement
+															)?.classList.remove("hidden");
+														}}
+													/>
+													<AppWindow class="h-5 w-5 text-muted-foreground hidden" />
+												</Show>
+											</div>
+											<div class="flex flex-col">
+												<span class="font-medium">{app.name}</span>
+												<Show when={app.description}>
+													<span class="text-xs text-muted-foreground line-clamp-1">
+														{app.description}
+													</span>
+												</Show>
+											</div>
 										</div>
-										<div className="flex flex-col">
-											<span className="font-medium">{app.name}</span>
-											{app.description && (
-												<span className="text-xs text-muted-foreground line-clamp-1">
-													{app.description}
-												</span>
-											)}
-										</div>
-									</div>
-									<CommandShortcut>↵</CommandShortcut>
-								</CommandItem>
-							))
-						)}
+										<CommandShortcut>↵</CommandShortcut>
+									</CommandItem>
+								)}
+							</For>
+						</Show>
 					</CommandGroup>
 				</CommandList>
 			</Command>
 
 			{/* Dialog do Histórico do Clipboard */}
 			<Dialog
-				open={clipboardDialogOpen}
+				open={clipboardDialogOpen()}
 				onOpenChange={setClipboardDialogOpen}
 			>
-				<DialogContent className="max-w-2xl max-h-[80vh]">
+				<DialogContent class="max-w-2xl max-h-[80vh]">
 					<DialogHeader>
 						<DialogTitle>Histórico do Clipboard</DialogTitle>
 					</DialogHeader>
-					<ScrollArea className="h-[60vh] pr-4">
-						<div className="space-y-2">
-							{clipboardEntries.length === 0 ? (
-								<div className="text-center py-8 text-muted-foreground">
-									<p>Nenhum item no histórico</p>
-									<p className="text-sm">Copie algo para começar</p>
-								</div>
-							) : (
-								clipboardEntries.map((entry) => (
-									<Button
-										key={entry.id}
-										variant="ghost"
-										onClick={() => handleCopyClipboard(entry)}
-										className="flex items-center gap-3 p-3 h-auto rounded-lg w-full justify-start"
-									>
-										<div className="flex h-10 w-10 items-center justify-center rounded bg-muted/50">
-											{entry.content_type === "text" ? (
-												<FileText className="h-5 w-5 text-muted-foreground" />
-											) : (
-												<ImageIcon className="h-5 w-5 text-muted-foreground" />
-											)}
-										</div>
-										<div className="flex flex-col flex-1 min-w-0 text-left">
-											<span className="font-medium truncate">
-												{entry.content_type === "text"
-													? (entry.preview || entry.content).replace(/\n/g, " ")
-													: "Imagem"}
-											</span>
-											<span className="text-xs text-muted-foreground">
-												{new Date(entry.created_at).toLocaleString()}
-											</span>
-										</div>
-									</Button>
-								))
-							)}
+					<ScrollArea class="h-[60vh] pr-4">
+						<div class="space-y-2">
+							<Show
+								when={clipboardStore.entries.length > 0}
+								fallback={
+									<div class="text-center py-8 text-muted-foreground">
+										<p>Nenhum item no histórico</p>
+										<p class="text-sm">Copie algo para começar</p>
+									</div>
+								}
+							>
+								<For each={clipboardStore.entries}>
+									{(entry) => (
+										<Button
+											variant="ghost"
+											onClick={() => handleCopyClipboard(entry)}
+											class="flex items-center gap-3 p-3 h-auto rounded-lg w-full justify-start"
+										>
+											<div class="flex h-10 w-10 items-center justify-center rounded bg-muted/50">
+												<Show
+													when={entry.content_type === "text"}
+													fallback={<ImageIcon class="h-5 w-5 text-muted-foreground" />}
+												>
+													<FileText class="h-5 w-5 text-muted-foreground" />
+												</Show>
+											</div>
+											<div class="flex flex-col flex-1 min-w-0 text-left">
+												<span class="font-medium truncate">
+													{entry.content_type === "text"
+														? (entry.preview || entry.content).replace(/\n/g, " ")
+														: "Imagem"}
+												</span>
+												<span class="text-xs text-muted-foreground">
+													{new Date(entry.created_at).toLocaleString()}
+												</span>
+											</div>
+										</Button>
+									)}
+								</For>
+							</Show>
 						</div>
 					</ScrollArea>
 				</DialogContent>

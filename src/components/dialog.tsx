@@ -1,76 +1,76 @@
-import type { ComponentChildren, JSX } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import type { JSX } from "solid-js";
+import { createEffect } from "solid-js";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	children: ComponentChildren;
+	children: JSX.Element;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
-	const dialogRef = useRef<HTMLDialogElement>(null);
+export function Dialog(props: DialogProps) {
+	let dialogRef: HTMLDialogElement | undefined;
 
-	useEffect(() => {
-		const dialog = dialogRef.current;
+	createEffect(() => {
+		const dialog = dialogRef;
 		if (!dialog) return;
 
-		if (open) {
+		if (props.open) {
 			dialog.showModal();
 		} else {
 			dialog.close();
 		}
-	}, [open]);
+	});
 
-	const handleBackdropClick = (e: JSX.TargetedMouseEvent<HTMLDialogElement>) => {
+	const handleBackdropClick = (e: MouseEvent) => {
 		// Only close if clicking directly on the dialog (backdrop), not on children
-		if (e.target === dialogRef.current) {
-			onOpenChange(false);
+		if (e.target === dialogRef) {
+			props.onOpenChange(false);
 		}
 	};
 
-	const handleKeyDown = (e: JSX.TargetedKeyboardEvent<HTMLDialogElement>) => {
+	const handleKeyDown = (e: KeyboardEvent) => {
 		if (e.key === "Escape") {
-			onOpenChange(false);
+			props.onOpenChange(false);
 		}
 	};
 
 	return (
 		<dialog
 			ref={dialogRef}
-			className="backdrop:bg-black/50 rounded-lg p-0 bg-background border border-border shadow-lg"
-			onClose={() => onOpenChange(false)}
+			class="backdrop:bg-black/50 rounded-lg p-0 bg-background border border-border shadow-lg"
+			onClose={() => props.onOpenChange(false)}
 			onClick={handleBackdropClick}
 			onKeyDown={handleKeyDown}
 		>
-			{children}
+			{props.children}
 		</dialog>
 	);
 }
 
 interface DialogContentProps {
-	children: ComponentChildren;
-	className?: string;
+	children: JSX.Element;
+	class?: string;
 }
 
-export function DialogContent({ children, className }: DialogContentProps) {
-	return <div className={cn("p-6", className)}>{children}</div>;
+export function DialogContent(props: DialogContentProps) {
+	return <div class={cn("p-6", props.class)}>{props.children}</div>;
 }
 
 interface DialogHeaderProps {
-	children: ComponentChildren;
-	className?: string;
+	children: JSX.Element;
+	class?: string;
 }
 
-export function DialogHeader({ children, className }: DialogHeaderProps) {
-	return <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}>{children}</div>;
+export function DialogHeader(props: DialogHeaderProps) {
+	return <div class={cn("flex flex-col space-y-1.5 text-center sm:text-left", props.class)}>{props.children}</div>;
 }
 
 interface DialogTitleProps {
-	children: ComponentChildren;
-	className?: string;
+	children: JSX.Element;
+	class?: string;
 }
 
-export function DialogTitle({ children, className }: DialogTitleProps) {
-	return <h2 className={cn("text-lg font-semibold leading-none tracking-tight", className)}>{children}</h2>;
+export function DialogTitle(props: DialogTitleProps) {
+	return <h2 class={cn("text-lg font-semibold leading-none tracking-tight", props.class)}>{props.children}</h2>;
 }

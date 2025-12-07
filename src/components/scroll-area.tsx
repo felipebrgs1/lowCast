@@ -1,20 +1,20 @@
-import type { ComponentChildren } from "preact";
+import type { JSX } from "solid-js";
 import { cn } from "@/lib/utils";
 
 interface ScrollAreaProps {
-	children: ComponentChildren;
-	className?: string;
+	children: JSX.Element;
+	class?: string;
 }
 
-export function ScrollArea({ children, className }: ScrollAreaProps) {
+export function ScrollArea(props: ScrollAreaProps) {
 	return (
 		<div
-			className={cn(
+			class={cn(
 				"relative overflow-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
-				className,
+				props.class,
 			)}
 		>
-			{children}
+			{props.children}
 		</div>
 	);
 }

@@ -20,9 +20,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    /* Preact JSX */
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact",
+    /* SolidJS JSX */
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

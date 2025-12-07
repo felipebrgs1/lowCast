@@ -1,17 +1,19 @@
 import { cn } from "@/lib/utils";
 
 interface SeparatorProps {
-	className?: string;
+	class?: string;
 	orientation?: "horizontal" | "vertical";
 }
 
-export function Separator({ className, orientation = "horizontal" }: SeparatorProps) {
+export function Separator(props: SeparatorProps) {
+	const orientation = props.orientation || "horizontal";
+
 	return (
 		<div
-			className={cn(
+			class={cn(
 				"shrink-0 bg-border",
 				orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
-				className,
+				props.class,
 			)}
 		/>
 	);

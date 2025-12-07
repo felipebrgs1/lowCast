@@ -1,9 +1,14 @@
 import Database from "@tauri-apps/plugin-sql";
+import { isTauri } from "@/lib/utils";
 
 let db: Database | null = null;
 
 export async function getDatabase(): Promise<Database> {
 	if (db) return db;
+
+	if (!isTauri()) {
+		throw new Error("Not in Tauri environment");
+	}
 
 	console.log("[Database] Initializing SQLite...");
 	try {

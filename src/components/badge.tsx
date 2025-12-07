@@ -1,9 +1,9 @@
-import type { ComponentChildren } from "preact";
+import type { JSX } from "solid-js";
 import { cn } from "@/lib/utils";
 
 interface BadgeProps {
-	children: ComponentChildren;
-	className?: string;
+	children: JSX.Element;
+	class?: string;
 	variant?: "default" | "secondary" | "destructive" | "outline";
 }
 
@@ -14,16 +14,18 @@ const badgeVariants = {
 	outline: "text-foreground",
 };
 
-export function Badge({ children, className, variant = "default" }: BadgeProps) {
+export function Badge(props: BadgeProps) {
+	const variant = props.variant || "default";
+
 	return (
 		<span
-			className={cn(
+			class={cn(
 				"inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
 				badgeVariants[variant],
-				className,
+				props.class,
 			)}
 		>
-			{children}
+			{props.children}
 		</span>
 	);
 }

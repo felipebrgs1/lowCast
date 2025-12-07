@@ -1,13 +1,21 @@
 import path from "node:path";
-import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import { defineConfig } from "vite";
+import solid from "vite-plugin-solid";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig({
-	plugins: [preact(), tailwindcss()],
+	plugins: [
+		TanStackRouterVite({
+			target: "solid",
+			autoCodeSplitting: true,
+		}),
+		solid(),
+		tailwindcss(),
+	],
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),

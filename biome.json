@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.html", "**/*.rs"],
+		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.html", "**/*.rs", "!**/routeTree.gen.ts"],
 		"ignoreUnknown": false
 	},
 	"formatter": {
@@ -18,8 +18,8 @@
 	},
 	"linter": {
 		"enabled": true,
-		"rules": {
-			"recommended": true
+		"domains": {
+			"solid": "all"
 		}
 	},
 	"javascript": {
