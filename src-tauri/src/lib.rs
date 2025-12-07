@@ -5,6 +5,7 @@
 mod apps;
 mod cli;
 mod encoding;
+mod image;
 mod window;
 
 use tauri::menu::{Menu, MenuItem};
@@ -47,6 +48,8 @@ pub fn run() {
             window::show_window,
             window::hide_window,
             window::toggle_window,
+            image::compress_png,
+            image::rgba_to_png,
         ])
         .setup(|app| {
             // === SYSTEM TRAY ===

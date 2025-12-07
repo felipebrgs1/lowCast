@@ -1,6 +1,7 @@
+import { invoke } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import * as clipboard from "@tauri-apps/plugin-clipboard-manager";
-import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readFile } from "@tauri-apps/plugin-fs";
 import { createStore } from "solid-js/store";
 import {
 	addClipboardEntry,
@@ -27,8 +28,8 @@ async function hashContent(content: string): Promise<string> {
 	return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Salvar imagem como PNG (compatível com clipboard do Windows)
-async function saveImageToFile(base64Data: string): Promise<string> {
+// Salvar imagem RGBA como PNG comprimido (lossless via Rust)
+async function saveImageFromRgba(rgbaBase64: string, width: number, height: number): Promise<string> {
 	const dataDir = await appDataDir();
 	const imagesDir = await join(dataDir, "clipboard_images");
 
@@ -36,17 +37,20 @@ async function saveImageToFile(base64Data: string): Promise<string> {
 		await mkdir(imagesDir, { recursive: true });
 	}
 
-	const hash = await hashContent(base64Data.slice(0, 500));
-	const filename = `${hash.slice(0, 16)}.png`; // PNG para compatibilidade
+	// Hash rápido usando dimensões + primeiros bytes
+	const hash = await hashContent(`${width}x${height}:${rgbaBase64.slice(0, 200)}`);
+	const filename = `${hash.slice(0, 16)}.png`;
 	const filepath = await join(imagesDir, filename);
 
 	if (!(await exists(filepath))) {
-		const binaryString = atob(base64Data);
-		const bytes = new Uint8Array(binaryString.length);
-		for (let i = 0; i < binaryString.length; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-		await writeFile(filepath, bytes);
+		// Enviar RGBA direto para Rust converter para PNG comprimido
+		const result = await invoke<string>("rgba_to_png", {
+			rgbaBase64,
+			width,
+			height,
+			outputPath: filepath,
+		});
+		console.log(`[Clipboard] ${result}`);
 	}
 
 	return filepath;
@@ -98,21 +102,24 @@ export async function searchClipboard(query: string) {
 
 export async function addEntry(type: "text" | "image", content: string) {
 	try {
-		const hash = await hashContent(type === "text" ? content : content.slice(0, 500));
-		let finalContent = content;
-		let preview: string | null = null;
-
-		if (type === "text") {
-			preview = content.slice(0, 200);
-		} else {
-			finalContent = await saveImageToFile(content);
-			preview = finalContent;
-		}
-
-		await addClipboardEntry(type, finalContent, preview, hash);
+		const hash = await hashContent(content.slice(0, 500));
+		const preview = content.slice(0, 200);
+		await addClipboardEntry(type, content, preview, hash);
 		await loadHistory();
 	} catch (error) {
 		console.error("[Clipboard] Error in addEntry:", error);
+	}
+}
+
+// Adicionar imagem a partir de RGBA (envia direto para Rust)
+export async function addImageEntry(rgbaBase64: string, width: number, height: number) {
+	try {
+		const hash = await hashContent(`${width}x${height}:${rgbaBase64.slice(0, 200)}`);
+		const filepath = await saveImageFromRgba(rgbaBase64, width, height);
+		await addClipboardEntry("image", filepath, filepath, hash);
+		await loadHistory();
+	} catch (error) {
+		console.error("[Clipboard] Error in addImageEntry:", error);
 	}
 }
 
@@ -197,29 +204,17 @@ async function pollImage() {
 					const rgba = await image.rgba();
 					console.log(`[Clipboard] RGBA: ${(rgba.byteLength / 1024 / 1024).toFixed(1)}MB`);
 
-					// Criar canvas para converter RGBA para PNG
-					const canvas = document.createElement("canvas");
-					const ctx = canvas.getContext("2d");
-
-					if (ctx) {
-						canvas.width = size.width;
-						canvas.height = size.height;
-						const imageData = new ImageData(new Uint8ClampedArray(rgba), size.width, size.height);
-						ctx.putImageData(imageData, 0, 0);
-
-						// Salvar como PNG (compatível com clipboard)
-						const dataUrl = canvas.toDataURL("image/png");
-						const base64 = dataUrl.split(",")[1];
-						console.log(`[Clipboard] PNG size: ${(base64.length / 1024).toFixed(0)}KB`);
-
-						lastImageHash = quickHash;
-						await addEntry("image", base64);
-
-						// Limpar canvas
-						ctx.clearRect(0, 0, canvas.width, canvas.height);
-						canvas.width = 0;
-						canvas.height = 0;
+					// Converter Uint8Array para base64 e enviar direto para Rust
+					let binary = "";
+					const bytes = new Uint8Array(rgba);
+					const len = bytes.byteLength;
+					for (let i = 0; i < len; i++) {
+						binary += String.fromCharCode(bytes[i]);
 					}
+					const rgbaBase64 = btoa(binary);
+
+					lastImageHash = quickHash;
+					await addImageEntry(rgbaBase64, size.width, size.height);
 				}
 			}
 		}
