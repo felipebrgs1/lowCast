@@ -18,7 +18,7 @@ interface ClipboardState {
 	isListening: boolean;
 }
 
-// Função para gerar hash simples do conteúdo
+// Hash simples do conteúdo
 async function hashContent(content: string): Promise<string> {
 	const encoder = new TextEncoder();
 	const data = encoder.encode(content);
@@ -27,23 +27,20 @@ async function hashContent(content: string): Promise<string> {
 	return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Salvar imagem como arquivo e retornar o path
+// Salvar imagem como PNG (compatível com clipboard do Windows)
 async function saveImageToFile(base64Data: string): Promise<string> {
 	const dataDir = await appDataDir();
 	const imagesDir = await join(dataDir, "clipboard_images");
 
-	// Criar diretório se não existir
 	if (!(await exists(imagesDir))) {
 		await mkdir(imagesDir, { recursive: true });
 	}
 
-	const hash = await hashContent(base64Data);
-	const filename = `${hash.slice(0, 16)}.png`;
+	const hash = await hashContent(base64Data.slice(0, 500));
+	const filename = `${hash.slice(0, 16)}.png`; // PNG para compatibilidade
 	const filepath = await join(imagesDir, filename);
 
-	// Verificar se já existe
 	if (!(await exists(filepath))) {
-		// Converter base64 para bytes
 		const binaryString = atob(base64Data);
 		const bytes = new Uint8Array(binaryString.length);
 		for (let i = 0; i < binaryString.length; i++) {
@@ -55,20 +52,13 @@ async function saveImageToFile(base64Data: string): Promise<string> {
 	return filepath;
 }
 
-let clipboardInterval: ReturnType<typeof setInterval> | null = null;
-let lastClipboardContent = "";
-// Canvas reutilizável para evitar leak de memória
-let reusableCanvas: HTMLCanvasElement | null = null;
-let reusableCtx: CanvasRenderingContext2D | null = null;
-
-function getReusableCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
-	if (!reusableCanvas) {
-		reusableCanvas = document.createElement("canvas");
-		reusableCtx = reusableCanvas.getContext("2d");
-	}
-	if (!reusableCtx) return null;
-	return { canvas: reusableCanvas, ctx: reusableCtx };
-}
+// Intervalos e estado
+let textInterval: ReturnType<typeof setTimeout> | null = null;
+let imageInterval: ReturnType<typeof setTimeout> | null = null;
+let lastTextContent = "";
+let lastImageHash = ""; // Hash da imagem ao invés de tamanho
+let isProcessingText = false;
+let isProcessingImage = false;
 
 const [clipboardStore, setClipboardStore] = createStore<ClipboardState>({
 	entries: [],
@@ -82,9 +72,7 @@ export { clipboardStore };
 export async function loadHistory() {
 	setClipboardStore({ isLoading: true });
 	try {
-		console.log("[Clipboard] Loading history...");
 		const entries = await getClipboardHistory();
-		console.log("[Clipboard] Loaded entries:", entries.length);
 		setClipboardStore({ entries });
 	} catch (error) {
 		console.error("[Clipboard] Error loading history:", error);
@@ -110,9 +98,7 @@ export async function searchClipboard(query: string) {
 
 export async function addEntry(type: "text" | "image", content: string) {
 	try {
-		console.log("[Clipboard] addEntry called, type:", type);
-		const hash = await hashContent(content);
-		console.log("[Clipboard] Hash generated:", hash.slice(0, 8));
+		const hash = await hashContent(type === "text" ? content : content.slice(0, 500));
 		let finalContent = content;
 		let preview: string | null = null;
 
@@ -123,11 +109,8 @@ export async function addEntry(type: "text" | "image", content: string) {
 			preview = finalContent;
 		}
 
-		console.log("[Clipboard] Saving to database...");
 		await addClipboardEntry(type, finalContent, preview, hash);
-		console.log("[Clipboard] Saved! Reloading history...");
 		await loadHistory();
-		console.log("[Clipboard] History reloaded!");
 	} catch (error) {
 		console.error("[Clipboard] Error in addEntry:", error);
 	}
@@ -147,98 +130,135 @@ export async function copyToClipboard(entry: ClipboardEntry) {
 	try {
 		if (entry.content_type === "text") {
 			await clipboard.writeText(entry.content);
-			lastClipboardContent = entry.content;
+			lastTextContent = entry.content;
 		} else {
-			// Ler o arquivo de imagem
 			const imageBytes = await readFile(entry.content);
-			// Escrever imagem no clipboard diretamente com os bytes
 			await clipboard.writeImage(imageBytes);
+			lastImageHash = "copied"; // Marcar para não re-detectar
 		}
 	} catch (error) {
 		console.error("[Clipboard] Error copying to clipboard:", error);
 	}
 }
 
-export function startListening() {
-	if (clipboardInterval) return;
+// Polling de TEXTO - leve
+async function pollText() {
+	if (!clipboardStore.isListening) return;
+	if (isProcessingText) {
+		textInterval = setTimeout(pollText, 2000);
+		return;
+	}
 
-	console.log("[Clipboard] Starting listener...");
-	setClipboardStore({ isListening: true });
+	isProcessingText = true;
 
-	clipboardInterval = setInterval(async () => {
-		try {
-			let contentProcessed = false;
+	try {
+		const text = await clipboard.readText();
+		if (text && text !== lastTextContent && text.trim() !== "") {
+			lastTextContent = text;
+			await addEntry("text", text);
+		}
+	} catch {
+		// Ignorar erros
+	}
 
-			// 1. Tentar ler texto
-			try {
-				const text = await clipboard.readText();
-				if (text && text !== lastClipboardContent && text.trim() !== "") {
-					console.log("[Clipboard] New text detected, saving...");
-					lastClipboardContent = text;
-					await addEntry("text", text);
-					console.log("[Clipboard] Text entry saved!");
-					contentProcessed = true;
-				}
-			} catch (_e) {
-				// Ignorar erros de leitura de texto
-			}
+	isProcessingText = false;
 
-			// 2. Tentar ler imagem (apenas se não processamos texto)
-			if (!contentProcessed) {
-				try {
-					const image = await clipboard.readImage();
-					if (image) {
-						// Converter para base64 PNG usando canvas reutilizável
-						const size = await image.size();
-						const rgba = await image.rgba();
+	if (clipboardStore.isListening) {
+		textInterval = setTimeout(pollText, 2000);
+	}
+}
 
-						const canvasResult = getReusableCanvas();
-						if (canvasResult) {
-							const { canvas, ctx } = canvasResult;
-							canvas.width = size.width;
-							canvas.height = size.height;
-							const imageData = new ImageData(new Uint8ClampedArray(rgba), size.width, size.height);
-							ctx.putImageData(imageData, 0, 0);
-							const dataUrl = canvas.toDataURL("image/png");
-							const base64 = dataUrl.split(",")[1];
+// Polling de IMAGEM - pesado, menos frequente
+async function pollImage() {
+	if (!clipboardStore.isListening) return;
+	if (isProcessingImage) {
+		imageInterval = setTimeout(pollImage, 15000); // Esperar mais se ainda processando
+		return;
+	}
 
-							// Verificar hash para evitar duplicatas
-							const hash = await hashContent(base64);
-							const contentKey = `image:${hash}`;
+	isProcessingImage = true;
 
-							if (lastClipboardContent !== contentKey) {
-								console.log("[Clipboard] New image detected, saving...");
-								lastClipboardContent = contentKey;
-								await addEntry("image", base64);
-								console.log("[Clipboard] Image entry saved!");
-							}
+	try {
+		const image = await clipboard.readImage();
+		if (image) {
+			const size = await image.size();
 
-							// Limpar o contexto para liberar memória
-							ctx.clearRect(0, 0, canvas.width, canvas.height);
-						}
+			// Criar hash rápido para detecção de mudança
+			const quickHash = `${size.width}x${size.height}`;
+
+			if (quickHash !== lastImageHash && size.width > 0) {
+				console.log(`[Clipboard] New image: ${size.width}x${size.height}`);
+
+				// Limite de 33 megapixels (permite até 8K: 7680x4320)
+				if (size.width * size.height > 33177600) {
+					console.log(`[Clipboard] Image too large, skipping (${size.width}x${size.height})`);
+					lastImageHash = quickHash;
+				} else {
+					const rgba = await image.rgba();
+					console.log(`[Clipboard] RGBA: ${(rgba.byteLength / 1024 / 1024).toFixed(1)}MB`);
+
+					// Criar canvas para converter RGBA para PNG
+					const canvas = document.createElement("canvas");
+					const ctx = canvas.getContext("2d");
+
+					if (ctx) {
+						canvas.width = size.width;
+						canvas.height = size.height;
+						const imageData = new ImageData(new Uint8ClampedArray(rgba), size.width, size.height);
+						ctx.putImageData(imageData, 0, 0);
+
+						// Salvar como PNG (compatível com clipboard)
+						const dataUrl = canvas.toDataURL("image/png");
+						const base64 = dataUrl.split(",")[1];
+						console.log(`[Clipboard] PNG size: ${(base64.length / 1024).toFixed(0)}KB`);
+
+						lastImageHash = quickHash;
+						await addEntry("image", base64);
+
+						// Limpar canvas
+						ctx.clearRect(0, 0, canvas.width, canvas.height);
+						canvas.width = 0;
+						canvas.height = 0;
 					}
-				} catch (_e) {
-					// Erro ao ler imagem ou clipboard vazio
 				}
-			}
-		} catch (error) {
-			if (error instanceof Error && !error.message.includes("empty")) {
-				console.error("[Clipboard] Read error:", error);
 			}
 		}
-	}, 1000); // Verificar a cada 1s
+	} catch {
+		// Ignorar erros de imagem
+	}
+
+	isProcessingImage = false;
+
+	if (clipboardStore.isListening) {
+		imageInterval = setTimeout(pollImage, 15000); // Imagem: a cada 15s
+	}
+}
+
+export function startListening() {
+	if (clipboardStore.isListening) return;
+
+	console.log("[Clipboard] Starting listeners...");
+	setClipboardStore({ isListening: true });
+
+	textInterval = setTimeout(pollText, 1000);
+	imageInterval = setTimeout(pollImage, 3000);
 }
 
 export function stopListening() {
-	if (clipboardInterval) {
-		clearInterval(clipboardInterval);
-		clipboardInterval = null;
+	console.log("[Clipboard] Stopping listeners...");
+
+	if (textInterval) {
+		clearTimeout(textInterval);
+		textInterval = null;
 	}
-	// Limpar canvas reutilizável para liberar memória
-	if (reusableCanvas && reusableCtx) {
-		reusableCtx.clearRect(0, 0, reusableCanvas.width, reusableCanvas.height);
+	if (imageInterval) {
+		clearTimeout(imageInterval);
+		imageInterval = null;
 	}
-	// Limpar lastClipboardContent para evitar retenção de strings grandes
-	lastClipboardContent = "";
+
+	lastTextContent = "";
+	lastImageHash = "";
+	isProcessingText = false;
+	isProcessingImage = false;
 	setClipboardStore({ isListening: false });
 }
