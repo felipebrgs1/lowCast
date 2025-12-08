@@ -65,8 +65,15 @@ export async function loadApplications() {
 		console.log("[AppsStore] Received apps from Rust:", apps.length);
 
 		// Mostrar apps imediatamente sem ícones
-		const appsWithoutIcons = apps.map((app) => ({ ...app, iconDataUrl: null }));
-		setAppsStore({ applications: appsWithoutIcons, filteredApps: appsWithoutIcons, loadingProgress: 20 });
+		const appsWithoutIcons = apps.map((app) => ({
+			...app,
+			iconDataUrl: null,
+		}));
+		setAppsStore({
+			applications: appsWithoutIcons,
+			filteredApps: appsWithoutIcons,
+			loadingProgress: 20,
+		});
 
 		// Filtrar apps com ícones válidos
 		const appsWithValidIcons: { app: Application; index: number }[] = [];
@@ -118,7 +125,10 @@ export async function loadApplications() {
 				iconResults.forEach((iconDataUrl, i) => {
 					const { app, index } = appsWithValidIcons[i];
 					addToIconCache(app.icon, iconDataUrl ?? null);
-					appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: iconDataUrl ?? null };
+					appsWithIcons[index] = {
+						...appsWithIcons[index],
+						iconDataUrl: iconDataUrl ?? null,
+					};
 				});
 			} catch (batchError) {
 				console.warn("[AppsStore] Batch icon loading failed, falling back to individual loading:", batchError);
@@ -131,7 +141,10 @@ export async function loadApplications() {
 							iconPath: app.icon,
 						});
 						addToIconCache(app.icon, dataUrl);
-						appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: dataUrl };
+						appsWithIcons[index] = {
+							...appsWithIcons[index],
+							iconDataUrl: dataUrl,
+						};
 					} catch {
 						addToIconCache(app.icon, null);
 					}
@@ -146,9 +159,13 @@ export async function loadApplications() {
 		const endTime = performance.now();
 		console.log(`[AppsStore] Apps with icons loaded in ${Math.round(endTime - startTime)}ms`);
 
-		setAppsStore({ applications: appsWithIcons, filteredApps: appsWithIcons, loadingProgress: 100 });
+		setAppsStore({
+			applications: appsWithIcons,
+			filteredApps: appsWithIcons,
+			loadingProgress: 100,
+		});
 	} catch (error) {
-		console.error("[AppsStore] Erro ao carregar aplicativos:", error);
+		console.error("[AppsStore] Error loading applications:", error);
 	} finally {
 		setAppsStore({ isLoading: false });
 	}
@@ -172,8 +189,15 @@ export async function refreshApplications() {
 		console.log("[AppsStore] Refreshed apps from Rust:", apps.length);
 
 		// Show apps immediately without icons
-		const appsWithoutIcons = apps.map((app) => ({ ...app, iconDataUrl: null }));
-		setAppsStore({ applications: appsWithoutIcons, filteredApps: appsWithoutIcons, loadingProgress: 20 });
+		const appsWithoutIcons = apps.map((app) => ({
+			...app,
+			iconDataUrl: null,
+		}));
+		setAppsStore({
+			applications: appsWithoutIcons,
+			filteredApps: appsWithoutIcons,
+			loadingProgress: 20,
+		});
 
 		// Load icons in batch
 		const appsWithValidIcons: { app: Application; index: number }[] = [];
@@ -204,16 +228,23 @@ export async function refreshApplications() {
 				iconResults.forEach((iconDataUrl, i) => {
 					const { app, index } = appsWithValidIcons[i];
 					addToIconCache(app.icon, iconDataUrl ?? null);
-					appsWithIcons[index] = { ...appsWithIcons[index], iconDataUrl: iconDataUrl ?? null };
+					appsWithIcons[index] = {
+						...appsWithIcons[index],
+						iconDataUrl: iconDataUrl ?? null,
+					};
 				});
 			} catch (batchError) {
 				console.warn("[AppsStore] Batch icon loading failed:", batchError);
 			}
 		}
 
-		setAppsStore({ applications: appsWithIcons, filteredApps: appsWithIcons, loadingProgress: 100 });
+		setAppsStore({
+			applications: appsWithIcons,
+			filteredApps: appsWithIcons,
+			loadingProgress: 100,
+		});
 	} catch (error) {
-		console.error("[AppsStore] Erro ao atualizar aplicativos:", error);
+		console.error("[AppsStore] Error refreshing applications:", error);
 	} finally {
 		setAppsStore({ isLoading: false });
 	}
@@ -243,6 +274,6 @@ export async function launchApp(app: Application) {
 	try {
 		await invoke("launch_application", { exec: app.exec });
 	} catch (error) {
-		console.error("Erro ao abrir aplicativo:", error);
+		console.error("Error launching application:", error);
 	}
 }

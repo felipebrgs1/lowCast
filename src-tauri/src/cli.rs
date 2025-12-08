@@ -64,18 +64,44 @@ pub fn process_cli_args(app: &tauri::AppHandle, args: Vec<String>) {
             let _ = window.set_focus();
             let _ = window.emit("cli-navigate", "/");
         }
+        Some("--screenshot") => {
+            // Emit event for fullscreen screenshot
+            let _ = window.emit("cli-screenshot", "fullscreen");
+            // Keep window hidden during screenshot
+        }
+        Some("--screenshot-area") | Some("-s") => {
+            // Emit event for region selection screenshot
+            let _ = window.emit("cli-screenshot", "area");
+            // Keep window hidden during screenshot
+        }
+        Some("--screenshot-gui") => {
+            // Show screenshot UI in the app
+            let _ = window.show();
+            let _ = window.set_focus();
+            let _ = window.emit("cli-navigate", "/screenshot");
+        }
         Some("--help") | Some("-h") => {
-            println!("lowCast - Desktop launcher and clipboard manager");
+            println!("lowCast - Desktop launcher, clipboard manager & screenshot tool");
             println!("\nUsage: lowcast [COMMAND]\n");
             println!("Commands:");
-            println!("  --show, (default)    Show the window");
-            println!("  --hide               Hide the window");
-            println!("  --toggle             Toggle window visibility");
-            println!("  --history            Show clipboard history");
-            println!("  --clipboard          Alias for --history");
-            println!("  --apps               Show applications list");
-            println!("  --home               Show home/search page");
-            println!("  --help, -h           Show this help message");
+            println!("  --show                Show the window");
+            println!("  --hide                Hide the window");
+            println!("  --toggle              Toggle window visibility (default)");
+            println!("  --history             Show clipboard history");
+            println!("  --clipboard           Alias for --history");
+            println!("  --apps                Show applications list");
+            println!("  --home                Show home/search page");
+            println!("\nScreenshot:");
+            println!("  --screenshot          Take full screen screenshot");
+            println!("  --screenshot-area, -s Select area and take screenshot");
+            println!("  --screenshot-gui      Open screenshot UI in app");
+            println!("\nExamples:");
+            println!("  lowcast --screenshot          # Full screen capture");
+            println!("  lowcast -s                    # Select area (uses slurp on Wayland)");
+            println!("\nHyprland binding example:");
+            println!("  bind = , Print, exec, lowcast --screenshot");
+            println!("  bind = SHIFT, Print, exec, lowcast -s");
+            println!("\n  --help, -h            Show this help message");
         }
         _ => {
             // Argumento desconhecido ou sem argumentos, apenas mostrar
