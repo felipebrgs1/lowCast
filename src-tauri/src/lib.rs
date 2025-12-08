@@ -3,6 +3,8 @@
 //! This is the main library entry point for the Tauri application.
 
 mod apps;
+#[cfg(feature = "app-monitor")]
+mod appmetrics;
 mod cli;
 mod encoding;
 mod image;
@@ -64,6 +66,22 @@ pub fn run() {
             sysmetrics::get_system_metrics,
             sysmetrics::get_top_processes,
             sysmetrics::get_cpu_per_core,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::collect_app_metrics,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::get_app_stats,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::get_app_metrics_history,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::app_log,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::get_app_logs,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::clear_app_logs,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::clear_app_metrics,
+            #[cfg(feature = "app-monitor")]
+            appmetrics::get_log_file_path,
         ])
         .setup(|app| {
             // === LAYER SHELL (Wayland Overlay) ===
@@ -166,6 +184,13 @@ pub fn run() {
             // Processar argumentos CLI na primeira inicialização
             let args: Vec<String> = std::env::args().collect();
             cli::process_cli_args(&app.handle(), args);
+
+            // Start background metrics collection
+            #[cfg(feature = "app-monitor")]
+            {
+                appmetrics::start_background_monitoring();
+                eprintln!("[app-monitor] Background metrics collection started");
+            }
 
             Ok(())
         })

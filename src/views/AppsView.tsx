@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/solid-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Activity, AppWindow, Clipboard, Monitor, RefreshCw, Scissors } from "lucide-solid";
+import { Activity, AppWindow, ChartLine, Clipboard, Monitor, RefreshCw, Scissors } from "lucide-solid";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {
 	Button,
@@ -114,6 +114,22 @@ export function AppsView(props: AppsViewProps) {
 							<CommandShortcut>↵</CommandShortcut>
 						</CommandItem>
 					</Link>
+					<Show when={import.meta.env.VITE_ENABLE_APP_MONITOR === "true"}>
+						<Link to="/monitor">
+							<CommandItem class="h-12">
+								<div class="flex items-center gap-3 w-full">
+									<div class="flex h-8 w-8 items-center justify-center rounded bg-orange-500/10">
+										<ChartLine class="h-5 w-5 text-orange-500" />
+									</div>
+									<div class="flex flex-col">
+										<span class="font-medium">App Monitor</span>
+										<span class="text-xs text-muted-foreground">Logs & performance metrics</span>
+									</div>
+								</div>
+								<CommandShortcut>↵</CommandShortcut>
+							</CommandItem>
+						</Link>
+					</Show>
 					<CommandItem
 						onSelect={handleScreenshotFullscreen}
 						class="h-12"

@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as MonitorRouteImport } from "./routes/monitor"
 import { Route as DevmodeRouteImport } from "./routes/devmode"
 import { Route as IndexRouteImport } from "./routes/index"
 
+const MonitorRoute = MonitorRouteImport.update({
+  id: "/monitor",
+  path: "/monitor",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevmodeRoute = DevmodeRouteImport.update({
   id: "/devmode",
   path: "/devmode",
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
   "/devmode": typeof DevmodeRoute
+  "/monitor": typeof MonitorRoute
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute
   "/devmode": typeof DevmodeRoute
+  "/monitor": typeof MonitorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/": typeof IndexRoute
   "/devmode": typeof DevmodeRoute
+  "/monitor": typeof MonitorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/" | "/devmode"
+  fullPaths: "/" | "/devmode" | "/monitor"
   fileRoutesByTo: FileRoutesByTo
-  to: "/" | "/devmode"
-  id: "__root__" | "/" | "/devmode"
+  to: "/" | "/devmode" | "/monitor"
+  id: "__root__" | "/" | "/devmode" | "/monitor"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DevmodeRoute: typeof DevmodeRoute
+  MonitorRoute: typeof MonitorRoute
 }
 
 declare module "@tanstack/solid-router" {
   interface FileRoutesByPath {
+    "/monitor": {
+      id: "/monitor"
+      path: "/monitor"
+      fullPath: "/monitor"
+      preLoaderRoute: typeof MonitorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/devmode": {
       id: "/devmode"
       path: "/devmode"
@@ -71,6 +88,7 @@ declare module "@tanstack/solid-router" {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DevmodeRoute: DevmodeRoute,
+  MonitorRoute: MonitorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
