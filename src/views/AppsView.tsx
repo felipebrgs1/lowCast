@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AppWindow, Clipboard, Monitor, RefreshCw, Scissors } from "lucide-solid";
+import { Link } from "@tanstack/solid-router";
+import { Activity, AppWindow, Clipboard, Monitor, RefreshCw, Scissors } from "lucide-solid";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {
 	Button,
@@ -99,6 +100,20 @@ export function AppsView(props: AppsViewProps) {
 						</div>
 						<CommandShortcut>↵</CommandShortcut>
 					</CommandItem>
+					<Link to="/devmode">
+						<CommandItem class="h-12">
+							<div class="flex items-center gap-3 w-full">
+								<div class="flex h-8 w-8 items-center justify-center rounded bg-purple-500/10">
+									<Activity class="h-5 w-5 text-purple-500" />
+								</div>
+								<div class="flex flex-col">
+									<span class="font-medium">DevMode</span>
+									<span class="text-xs text-muted-foreground">System monitor & performance</span>
+								</div>
+							</div>
+							<CommandShortcut>↵</CommandShortcut>
+						</CommandItem>
+					</Link>
 					<CommandItem
 						onSelect={handleScreenshotFullscreen}
 						class="h-12"

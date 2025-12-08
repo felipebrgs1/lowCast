@@ -9,8 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as DevmodeRouteImport } from "./routes/devmode"
 import { Route as IndexRouteImport } from "./routes/index"
 
+const DevmodeRoute = DevmodeRouteImport.update({
+  id: "/devmode",
+  path: "/devmode",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
@@ -19,28 +25,39 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
+  "/devmode": typeof DevmodeRoute
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute
+  "/devmode": typeof DevmodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/": typeof IndexRoute
+  "/devmode": typeof DevmodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/"
+  fullPaths: "/" | "/devmode"
   fileRoutesByTo: FileRoutesByTo
-  to: "/"
-  id: "__root__" | "/"
+  to: "/" | "/devmode"
+  id: "__root__" | "/" | "/devmode"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DevmodeRoute: typeof DevmodeRoute
 }
 
 declare module "@tanstack/solid-router" {
   interface FileRoutesByPath {
+    "/devmode": {
+      id: "/devmode"
+      path: "/devmode"
+      fullPath: "/devmode"
+      preLoaderRoute: typeof DevmodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/": {
       id: "/"
       path: "/"
@@ -53,6 +70,7 @@ declare module "@tanstack/solid-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DevmodeRoute: DevmodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

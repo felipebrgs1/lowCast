@@ -8,6 +8,7 @@ mod encoding;
 mod image;
 mod layer_shell;
 mod screenshot;
+mod sysmetrics;
 mod window;
 
 use tauri::menu::{Menu, MenuItem};
@@ -60,6 +61,9 @@ pub fn run() {
             screenshot::get_screenshot_capabilities,
             screenshot::copy_screenshot_to_clipboard,
             screenshot::open_screenshots_folder,
+            sysmetrics::get_system_metrics,
+            sysmetrics::get_top_processes,
+            sysmetrics::get_cpu_per_core,
         ])
         .setup(|app| {
             // === LAYER SHELL (Wayland Overlay) ===
