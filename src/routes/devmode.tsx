@@ -88,7 +88,10 @@ function DevMode() {
 					>
 						{isRunning() ? "Pause" : "Resume"}
 					</Button>
-					<Button onClick={() => window.history.back()} variant="outline">
+					<Button
+						onClick={() => window.history.back()}
+						variant="outline"
+					>
 						Back
 					</Button>
 				</div>
@@ -118,10 +121,7 @@ function DevMode() {
 							<Card class="p-4">
 								<div class="text-sm text-muted-foreground">Swap</div>
 								<div class="text-2xl font-bold">
-									{m().swap_total > 0
-										? ((m().swap_used / m().swap_total) * 100).toFixed(1)
-										: "0"}
-									%
+									{m().swap_total > 0 ? ((m().swap_used / m().swap_total) * 100).toFixed(1) : "0"}%
 								</div>
 								<div class="text-xs text-muted-foreground">
 									{formatBytes(m().swap_used)} / {formatBytes(m().swap_total)}

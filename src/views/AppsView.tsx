@@ -1,5 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Link } from "@tanstack/solid-router";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Activity, AppWindow, Clipboard, Monitor, RefreshCw, Scissors } from "lucide-solid";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import {
