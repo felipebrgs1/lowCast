@@ -126,4 +126,4 @@ The executable will be located in `src-tauri/target/release/bundle/`.
 
 ### 💡 Contributing
 
-Ideas for new tools? Open an [Issue](https://github.com/felipebrgs1/lowCast/issues) or contribute with a PR!
+Confira o [CONTRIBUTING](CONTRIBUTING.md) para orientações rápidas. Ideias para novos recursos? Abra uma [Issue](https://github.com/felipebrgs1/lowCast/issues) ou envie uma PR!
